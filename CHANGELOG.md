@@ -1,3 +1,14 @@
+## [4.2.2](https://github.com/banter240/tado_hijack/compare/v4.2.1...v4.2.2) (2026-02-07)
+
+### 🐛 Bug Fixes
+
+* fix(device): update child lock cache immediately to prevent reversion
+
+Synchronously updates the local `devices_meta` cache when setting Child Lock.
+
+- Prevents the switch entity from reverting to its old state during the next fast poll cycle (which uses cached metadata).
+- Mirrors the fix applied to temperature offsets for device-level properties.
+
 ## [4.2.1](https://github.com/banter240/tado_hijack/compare/v4.2.0...v4.2.1) (2026-02-07)
 
 ### 🐛 Bug Fixes
