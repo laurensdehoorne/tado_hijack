@@ -1,3 +1,23 @@
+## [4.2.1](https://github.com/banter240/tado_hijack/compare/v4.2.0...v4.2.1) (2026-02-07)
+
+### 🐛 Bug Fixes
+
+* fix(offset): update cache immediately to prevent state reversion
+
+Updates the internal `offsets_cache` synchronously when setting a new value.
+
+- Prevents the entity from reverting to its old value during the next fast poll cycle (which relies on cached offsets).
+- Ensures UI consistency between the optimistic update and the next full hardware sync.
+
+
+### 📚 Documentation
+
+* docs: refine debouncing documentation and reorder API usage notices
+
+- Reordered README notices to prioritize high API usage explanation for better visibility.
+- Updated 'Pending Command Tracking' and 'Debounced' descriptions to include button click interactions alongside sliders.
+- Synchronized technical examples in DESIGN.md to reflect both UI button and slider interaction patterns.
+
 ## [4.2.0](https://github.com/banter240/tado_hijack/compare/v4.1.0...v4.2.0) (2026-02-03)
 
 ### ✨ New Features
