@@ -907,6 +907,8 @@ class TadoDataUpdateCoordinator(DataUpdateCoordinator[TadoData]):
         old_val = None
         if device := self.devices_meta.get(serial_no):
             old_val = getattr(device, "child_lock_enabled", None)
+            device.child_lock_enabled = enabled
+
         await self.property_manager.async_set_device_property(
             serial_no,
             CommandType.SET_CHILD_LOCK,
