@@ -10,8 +10,8 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import slugify
 
-from .const import DEVICE_TYPE_MAP, DOMAIN, ZONE_TYPE_HOT_WATER
-from .helpers.device_linker import get_homekit_identifiers
+from .const import DEVICE_TYPE_MAP, DOMAIN, GEN_X, ZONE_TYPE_HOT_WATER
+from .helpers.device_linker import get_linked_device_identifiers
 from .models import TadoEntityDefinition
 
 if TYPE_CHECKING:
@@ -26,7 +26,6 @@ class TadoDefinitionMixin:
         """Initialize the definition mixin."""
         self._definition = definition
 
-        # Apply standard properties from definition
         if icon := definition.get("icon"):
             self._attr_icon = icon
         if device_class := definition.get("ha_device_class"):
@@ -286,32 +285,48 @@ class TadoHomeEntity(TadoEntity):
         if self.coordinator.config_entry is None:
             raise RuntimeError("Config entry not available")
 
-        identifiers = {(DOMAIN, self.coordinator.config_entry.entry_id)}
+        # Use Home ID (unique_id) as identifier for consistent grouping
+        identifiers = {
+            (
+                DOMAIN,
+                self.coordinator.config_entry.unique_id
+                or self.coordinator.config_entry.entry_id,
+            )
+        }
 
         name = self.coordinator.config_entry.title
-        model = "Internet Bridge"
+        model = (
+            "Internet Bridge" if self.coordinator.generation != GEN_X else "Tado Home"
+        )
         sw_version = None
+        serial_number = None
 
         # Link to Bridges if found
         for bridge in self.coordinator.bridges:
             identifiers.add((DOMAIN, bridge.serial_no))
-            if hk_ids := get_homekit_identifiers(
-                self.coordinator.hass, bridge.serial_no
-            ):
-                identifiers.update(hk_ids)
+            # Link external devices (HomeKit/Matter) - skip if full_cloud_mode
+            if not self.coordinator.full_cloud_mode:
+                if linked_ids := get_linked_device_identifiers(
+                    self.coordinator.hass, bridge.serial_no, self.coordinator.generation
+                ):
+                    identifiers.update(linked_ids)
 
-            # Use first bridge for metadata (HomeKit-style name)
+            # Use first bridge for metadata
             if sw_version is None:
-                name = f"tado Internet Bridge {bridge.serial_no}"
+                # In Classic mode, we follow OG style if a bridge is found
+                if self.coordinator.generation != GEN_X:
+                    name = f"tado Internet Bridge {bridge.serial_no}"
+
                 model = bridge.device_type
                 sw_version = bridge.current_fw_version
-
+                serial_number = bridge.serial_no
         return DeviceInfo(
             identifiers=identifiers,
             name=name,
             manufacturer="Tado",
             model=model,
             sw_version=sw_version,
+            serial_number=serial_number,
             configuration_url="https://app.tado.com",
         )
 
@@ -360,19 +375,28 @@ class TadoZoneEntity(TadoEntity):
         if self.coordinator.config_entry is None:
             raise RuntimeError("Config entry not available")
 
-        zone = self.tado_coordinator.zones_meta.get(self._zone_id)
-        model = (
-            "Hot Water Zone"
-            if zone and zone.type == ZONE_TYPE_HOT_WATER
-            else "Heating Zone"
-        )
+        from .const import GEN_X
+
+        if self.tado_coordinator.generation == GEN_X:
+            model = "Heating Zone"
+        else:
+            zone = self.tado_coordinator.zones_meta.get(self._zone_id)
+            model = (
+                "Hot Water Zone"
+                if zone and zone.type == ZONE_TYPE_HOT_WATER
+                else "Heating Zone"
+            )
 
         return DeviceInfo(
-            identifiers={(DOMAIN, f"zone_{self._zone_id}")},
+            identifiers={
+                (
+                    DOMAIN,
+                    f"{self.coordinator.config_entry.entry_id}_zone_{self._zone_id}",
+                )
+            },
             name=self._zone_name,
             manufacturer="Tado",
             model=model,
-            via_device=(DOMAIN, self.coordinator.config_entry.entry_id),
         )
 
     @property
@@ -403,11 +427,15 @@ class TadoHotWaterZoneEntity(TadoEntity):
             raise RuntimeError("Config entry not available")
         # Use zone name directly - Tado typically names it "Hot Water" already
         return DeviceInfo(
-            identifiers={(DOMAIN, f"zone_{self._zone_id}")},
+            identifiers={
+                (
+                    DOMAIN,
+                    f"{self.coordinator.config_entry.entry_id}_zone_{self._zone_id}",
+                )
+            },
             name=self._zone_name,
             manufacturer="Tado",
             model="Hot Water Zone",
-            via_device=(DOMAIN, self.coordinator.config_entry.entry_id),
         )
 
 
@@ -432,7 +460,13 @@ class TadoDeviceEntity(TadoEntity):
         self._zone_id = zone_id
         self._fw_version = fw_version
 
-        self._linked_identifiers = get_homekit_identifiers(coordinator.hass, serial_no)
+        # Link external devices (HomeKit/Matter) - skip if full_cloud_mode
+        if not coordinator.full_cloud_mode:
+            self._linked_identifiers = get_linked_device_identifiers(
+                coordinator.hass, serial_no, coordinator.generation
+            )
+        else:
+            self._linked_identifiers = set()
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -448,7 +482,10 @@ class TadoDeviceEntity(TadoEntity):
             name=f"tado {model_name} {self._short_serial}",
             manufacturer="Tado",
             model=model_name,
-            via_device=(DOMAIN, f"zone_{self._zone_id}"),
+            via_device=(
+                DOMAIN,
+                f"{self.coordinator.config_entry.entry_id}_zone_{self._zone_id}",
+            ),
             sw_version=self._fw_version,
             serial_number=self._serial_no,
         )

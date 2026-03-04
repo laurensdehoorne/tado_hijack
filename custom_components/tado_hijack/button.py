@@ -8,6 +8,7 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .entity import (
+    TadoDeviceEntity,
     TadoGenericEntityMixin,
     TadoHomeEntity,
     TadoZoneEntity,
@@ -37,6 +38,7 @@ async def async_setup_entry(
         {
             "home": TadoGenericHomeButton,
             "zone": TadoGenericZoneButton,
+            "device": TadoGenericDeviceButton,
         },
     )
 
@@ -80,6 +82,35 @@ class TadoGenericZoneButton(TadoZoneEntity, TadoGenericEntityMixin, ButtonEntity
             zone_name,
         )
         TadoGenericEntityMixin.__init__(self, definition)
+
+    async def async_press(self) -> None:
+        """Handle the button press."""
+        await self._async_press()
+
+
+class TadoGenericDeviceButton(TadoDeviceEntity, TadoGenericEntityMixin, ButtonEntity):
+    """Generic button for Device scope."""
+
+    def __init__(
+        self,
+        coordinator: TadoDataUpdateCoordinator,
+        definition: TadoEntityDefinition,
+        device: Any,
+        zone_id: int,
+    ) -> None:
+        """Initialize the generic device button."""
+        TadoDeviceEntity.__init__(
+            self,
+            coordinator,
+            cast(str, definition["translation_key"]),
+            device.serial_no,
+            device.short_serial_no,
+            device.device_type,
+            zone_id,
+            device.current_fw_version,
+        )
+        TadoGenericEntityMixin.__init__(self, definition)
+        self._set_entity_id("button", definition["key"])
 
     async def async_press(self) -> None:
         """Handle the button press."""

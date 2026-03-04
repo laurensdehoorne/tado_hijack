@@ -7,8 +7,11 @@ and save API quota. Simulates API-side validation rules.
 from __future__ import annotations
 
 
+from typing import Any
+
+
 def validate_overlay_payload(
-    data: dict, zone_type: str, supports_temp: bool = True
+    data: dict[str, Any], zone_type: str, supports_temp: bool = True
 ) -> tuple[bool, str | None]:
     """Validate overlay payload before sending to Tado API.
 
@@ -42,8 +45,19 @@ def validate_overlay_payload(
                     False,
                     f"temperature (celsius) required for AIR_CONDITIONING in {mode} mode",
                 )
+            # FAN mode requires fanLevel or fanSpeed
+            if mode == "FAN":
+                has_fan_level = setting.get("fanLevel") is not None
+                has_fan_speed = setting.get("fanSpeed") is not None
+                if not (has_fan_level or has_fan_speed):
+                    return (
+                        False,
+                        f"fanLevel or fanSpeed required for AIR_CONDITIONING in FAN mode (Payload settings: {setting.keys()})",
+                    )
 
     elif zone_type == "HEATING":
+        # HEATING with power=ON requires temperature
+        # Exception: temperature=0 is magic number for OFF mode (validated in executor)
         if power == "ON" and not has_temp:
             return False, "temperature (celsius) required for HEATING with power=ON"
 
