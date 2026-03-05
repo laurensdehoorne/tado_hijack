@@ -1,3 +1,29 @@
+## [5.0.2](https://github.com/banter240/tado_hijack/compare/v5.0.1...v5.0.2) (2026-03-05)
+
+### 🐛 Bug Fixes
+
+* fix(climate): AC and hot water climate entities always created regardless of full_cloud_mode
+
+⚠️ UPGRADING FROM v4.x? READ THIS:
+- Entity unique_ids changed → all entities will be recreated. Delete and
+  re-add the integration to avoid duplicates.
+- Minimum Home Assistant version is now 2024.11.0.
+- Generation selection (Classic V2/V3 or Tado X) is now required on setup.
+- Existing installs are migrated automatically on first load.
+See v5.0.0 and v5.0.1 release notes for full details.
+
+full_cloud_mode should only gate HEATING climate entities since those zones
+are handled by HomeKit/Matter when disabled. AC zones have no HomeKit support
+and their climate entities must always be created.
+
+- V2/V3 AC climate entities: always created
+- V2/V3 HEATING climate entities: only when full_cloud_mode=True
+- Tado X climate entities: only when full_cloud_mode=True (Matter handles otherwise)
+- Hot Water: unaffected, handled by water_heater platform
+
+Users on v5.0.x missing AC climate entities: reload the integration,
+no reinstall required.
+
 ## [5.0.1](https://github.com/banter240/tado_hijack/compare/v5.0.0...v5.0.1) (2026-03-05)
 
 ### 🐛 Bug Fixes
