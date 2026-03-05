@@ -1,3 +1,73 @@
+## [5.0.1](https://github.com/banter240/tado_hijack/compare/v5.0.0...v5.0.1) (2026-03-05)
+
+### 🐛 Bug Fixes
+
+* fix(config_flow): quota interval and safety reserve not persisted on save
+
+Both values were extracted from the wrong section in _flatten_section_data,
+causing them to silently reset to defaults on reopen. Also fixes a float
+cast issue for safety reserve and updates mypy hook to python3.14.
+
+
+### 📚 Documentation
+
+* docs(core): upgrade notice for v5.0.0 breaking changes
+
+For users upgrading from v4.x directly to v5.0.1: v5.0.0 introduced
+breaking changes that require attention before upgrading.
+
+⚠️ IMPORTANT — READ BEFORE UPGRADING FROM v4.x
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Entity unique_id format changed:
+- Old: {entry_id}_{suffix}
+- New: {entry_id}_zone_{zone_id}_{suffix}
+- Effect: ALL entities will be recreated on first start after upgrade
+- Action: Delete and re-add the integration to avoid duplicate entities
+
+Minimum Home Assistant version: 2024.11.0 (required for Matter support)
+
+New mandatory setup step:
+- Generation selection is now required during initial config
+- Choose "Tado V2/V3 (Classic API)" or "Tado X (Matter Bridge)"
+- Existing installs will be migrated automatically on first load
+
+See full v5.0.0 release notes for details on new features (Tado X support,
+V2 bridge, full cloud mode, multi-account, redundancy suppression).
+
+* docs(quota): document adaptive reset window learning (shipped in v5.0.0)
+
+This feature was included in v5.0.0 but omitted from the release notes.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🧠 ADAPTIVE QUOTA RESET WINDOW LEARNING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Tado's daily API quota does not reset at a fixed time — the exact hour varies
+per user account (observed: 7:30, 12:04, 14:xx, etc.). The integration now
+learns your specific reset schedule automatically.
+
+How it works (helpers/reset_window_tracker.py):
+- Every detected quota reset is recorded with its timestamp
+- Timestamps are normalized to X:30 to group resets within the same hour
+- After 2 consecutive resets at the same hour → pattern is adopted ("learned")
+- Single observation → stored but not adopted (may be anomaly)
+- No pattern yet → fallback to default window (12:30)
+
+Quota budget is then distributed relative to the learned reset time:
+- Planning horizon: always minimum 20h ahead (conservative)
+- Safety reserve: adaptively spread across the reset window
+- Result: fewer wasted calls at end-of-day, smoother polling across 24h
+
+Exposed via sensors (definitions.py):
+- quota_reset_last: Last observed reset time
+- quota_reset_next: Next expected reset time
+- quota_reset_expected_window: Learned or default window
+- quota_reset_pattern_confidence: "learned" / "single_observation" / "default"
+- quota_reset_history_count: Number of resets in history (max 5)
+
+State is persisted across HA restarts via helpers/storage.py.
+
 ## [5.0.0](https://github.com/banter240/tado_hijack/compare/v4.3.0...v5.0.0) (2026-03-04)
 
 ### ⚠ BREAKING CHANGES
