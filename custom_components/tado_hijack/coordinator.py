@@ -700,6 +700,16 @@ class TadoDataUpdateCoordinator(DataUpdateCoordinator[Any]):
             TadoCommand(CommandType.MANUAL_POLL, data={"type": refresh_type}),
         )
 
+    async def async_targeted_fetch(self, refresh_type: str, entity_id: str) -> None:
+        """Fetch a specific data type for a single entity (targeted, cheaper than full poll)."""
+        _LOGGER.info("Targeted fetch: type=%s entity=%s", refresh_type, entity_id)
+        targeted = await self.data_manager.async_targeted_fetch(refresh_type, entity_id)
+        if targeted:
+            self.async_update_listeners()
+        else:
+            # Fell back to cache invalidation — need a full coordinator refresh
+            await self.async_refresh()
+
     def update_rate_limit_local(self, silent: bool = False) -> None:
         """Update local stats and sync internal remaining from headers."""
         self.rate_limit.sync_from_headers()

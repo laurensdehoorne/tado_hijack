@@ -1,4 +1,25 @@
 # Shared Field Definitions (DRY)
+manual_poll:
+  fields:
+    refresh_type:
+      description: "Which data to refresh. Use with entity_id for a targeted single-entity fetch (saves API quota). Without entity_id, all entities of that type are refreshed."
+      default: "all"
+      selector:
+        select:
+          options:
+            - "all"
+            - "zone"
+            - "metadata"
+            - "offsets"
+            - "away"
+            - "capabilities"
+            - "presence"
+    entity_id:
+      description: "Optional: restrict the refresh to a single entity (targeted fetch). Supported for: offsets, away, capabilities. Other types fall back to a full refresh."
+      selector:
+        entity:
+          integration: tado_hijack
+
 set_mode:
   description: "Set a manual mode (overlay) with optional timer for Heating and AC zones."
   fields:

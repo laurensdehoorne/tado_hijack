@@ -112,8 +112,17 @@ async def async_setup_services(
     async def handle_manual_poll(call: ServiceCall) -> None:
         """Service to force refresh."""
         refresh_type = call.data.get("refresh_type", "all")
-        _LOGGER.debug("Service call: manual_poll (type: %s)", refresh_type)
-        await coordinator.async_manual_poll(refresh_type)
+        entity_id = call.data.get("entity_id")
+        if entity_id:
+            _LOGGER.debug(
+                "Service call: manual_poll (type: %s, entity: %s)",
+                refresh_type,
+                entity_id,
+            )
+            await coordinator.async_targeted_fetch(refresh_type, entity_id)
+        else:
+            _LOGGER.debug("Service call: manual_poll (type: %s)", refresh_type)
+            await coordinator.async_manual_poll(refresh_type)
 
     async def handle_resume_schedules(call: ServiceCall) -> None:
         """Service to resume all schedules."""

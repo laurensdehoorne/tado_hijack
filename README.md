@@ -314,8 +314,8 @@ Tado's API limits are restrictive. That's why Tado Hijack uses a **Zero-Waste Po
 | **Presence Poll**   | **1**  | 12h (Default) | Home/Away presence state.                | `GET /homes/{id}/state`                                                                |
 | **Hardware Sync**   | **2+** | 24h (Default) | Syncs battery, firmware and device list. | `GET /homes/{id}/zones`<br>`GET /homes/{id}/devices`<br>`GET /zones/{id}/capabilities` |
 | **Refresh Zones**   | **2**  | On Demand     | Updates zone/device metadata.            | `GET /homes/{id}/zones`<br>`GET /homes/{id}/devices`                                   |
-| **Refresh Offsets** | **N**  | On Demand     | Fetches all device offsets.              | `GET /devices/{s}/temperatureOffset` (×N)                                              |
-| **Refresh Away**    | **M**  | On Demand     | Fetches all zone away temps.             | `GET /zones/{z}/awayConfiguration` (×M)                                                |
+| **Refresh Offsets** | **1–N**  | On Demand  | Fetches device offsets. 1 call with `entity_id`, N without. | `GET /devices/{s}/temperatureOffset` (×1 or ×N)                                  |
+| **Refresh Away**    | **1–M**  | On Demand  | Fetches zone away temps. 1 call with `entity_id`, M without. | `GET /zones/{z}/awayConfiguration` (×1 or ×M)                                   |
 | **Zone Overlay**    | **1**  | On Demand     | **Fused:** All zone changes in 1 call.   | `POST /homes/{id}/overlay`                                                             |
 | **Home/Away**       | **1**  | On Demand     | Force presence lock.                     | `PUT /homes/{id}/presenceLock`                                                         |
 
@@ -754,7 +754,7 @@ For advanced automation, use these services. All manual control services feature
 | `tado_hijack.set_mode`              | Set mode, temperature, and termination. Supports `hvac_mode` (auto, heat, off) and `overlay` (manual, next_block, presence). | **1 call** (batched) | **1 call** (batched) |
 | `tado_hijack.set_mode_all_zones`    | Targets all HEATING and/or AC zones at once using `hvac_mode`.                                                               | **1 call** (bulk)    | **N calls** (per zone) |
 | `tado_hijack.set_water_heater_mode` | Set `operation_mode` and temperature for hot water (v3 only).                                                                | **1 call**           | N/A (no HW zones)    |
-| `tado_hijack.manual_poll`           | Force immediate data refresh. Use `refresh_type` to control scope.                                                           | **2-N** (depends)    | **2-N** (depends)    |
+| `tado_hijack.manual_poll`           | Force immediate data refresh. Use `refresh_type` to control scope. Add `entity_id` for a targeted single-entity fetch (saves quota). | **1-N** (depends)    | **1-N** (depends)    |
 
 <br>
 
@@ -770,6 +770,8 @@ For advanced automation, use these services. All manual control services feature
 
 > [!TIP]
 > **Targeting Rooms:** You can use **any** Tado zone entity (climate, switch, sensor) or even **device entities** (battery, connection, child_lock) as the `entity_id`. Device entities automatically resolve to their zone via serial number lookup. This includes your existing **HomeKit climate** entities (e.g. `climate.living_room`).
+>
+> **Targeted Fetch:** When using `manual_poll` with an `entity_id`, the refresh is limited to that single entity — `offsets` costs 1 API call instead of N, `away` costs 1 instead of M. `capabilities` uses the lazy cache and only drops that zone's entry. Bulk types (`zone`, `metadata`, `presence`, `all`) always fall back to a full refresh.
 
 <br>
 

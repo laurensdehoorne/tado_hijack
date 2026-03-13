@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from ...const import BOOST_MODE_TEMP, POWER_OFF, POWER_ON, ZONE_TYPE_HEATING
+from ...const import BOOST_MODE_TEMP, POWER_OFF, POWER_ON
 from ...models import CommandType, TadoCommand
 from ..action_provider_base import TadoActionProvider
 from ..discovery import yield_zones
@@ -29,16 +29,14 @@ class TadoV3ActionProvider(TadoActionProvider):
         self.coordinator = coordinator
 
     async def async_resume_all_schedules(self) -> None:
-        """Resume schedule for all active heating zones (v3)."""
-        active_zones = self.get_active_zone_ids(include_heating=True)
+        """Resume schedule for all active zones (v3)."""
+        active_zones = self.get_active_zone_ids(include_heating=True, include_ac=True)
 
         if not active_zones:
-            _LOGGER.warning("No active heating zones to resume")
+            _LOGGER.warning("No active zones to resume")
             return
 
-        _LOGGER.info(
-            "Queued resume schedules for %d active heating zones", len(active_zones)
-        )
+        _LOGGER.info("Queued resume schedules for %d active zones", len(active_zones))
 
         for zone_id in active_zones:
             old_state = patch_zone_resume(
@@ -59,22 +57,18 @@ class TadoV3ActionProvider(TadoActionProvider):
         self.coordinator.async_update_listeners()
 
     async def async_boost_all_zones(self) -> None:
-        """Boost all active heating zones to 25°C (v3)."""
+        """Boost all active zones to 25°C (v3)."""
         self._apply_bulk_zone_overlay(
             command_key="boost_all",
-            setting={
-                "power": POWER_ON,
-                "type": ZONE_TYPE_HEATING,
-                "temperature": {"celsius": BOOST_MODE_TEMP},
-            },
+            setting={"power": POWER_ON, "temperature": {"celsius": BOOST_MODE_TEMP}},
             action_name="boost",
         )
 
     async def async_turn_off_all_zones(self) -> None:
-        """Turn off all active heating zones (v3)."""
+        """Turn off all active zones (v3)."""
         self._apply_bulk_zone_overlay(
             command_key="turn_off_all",
-            setting={"power": POWER_OFF, "type": ZONE_TYPE_HEATING},
+            setting={"power": POWER_OFF},
             action_name="turn off",
         )
 
@@ -84,11 +78,11 @@ class TadoV3ActionProvider(TadoActionProvider):
         setting: dict[str, Any],
         action_name: str,
     ) -> None:
-        """Apply same overlay setting to all heating zones (DRY helper)."""
-        zone_ids = self.get_active_zone_ids(include_heating=True)
+        """Apply same overlay setting to all active zones (DRY helper)."""
+        zone_ids = self.get_active_zone_ids(include_heating=True, include_ac=True)
 
         if not zone_ids:
-            _LOGGER.warning("No active heating zones to %s", action_name)
+            _LOGGER.warning("No active zones to %s", action_name)
             return
 
         _LOGGER.info("Queued %s for %d active zones", action_name, len(zone_ids))
@@ -133,14 +127,25 @@ class TadoV3ActionProvider(TadoActionProvider):
         include_ac: bool = False,
     ) -> list[int]:
         """Get active zone IDs (v3 uses zone.id)."""
-        return [
-            zone.id
-            for zone in yield_zones(
+        all_zones = list(
+            yield_zones(
                 self.coordinator,
                 include_heating=include_heating,
                 include_hot_water=include_hot_water,
                 include_ac=include_ac,
             )
+        )
+        _LOGGER.debug(
+            "get_active_zone_ids: zones_meta has %d entries, matched %d zones (H=%s AC=%s HW=%s)",
+            len(self.coordinator.zones_meta),
+            len(all_zones),
+            include_heating,
+            include_ac,
+            include_hot_water,
+        )
+        return [
+            zone.id
+            for zone in all_zones
             if not self.coordinator.entity_resolver.is_zone_disabled(zone.id)
         ]
 

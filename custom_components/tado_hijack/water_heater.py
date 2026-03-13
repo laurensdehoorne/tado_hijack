@@ -134,13 +134,22 @@ class TadoHotWater(
         if opt_overlay is False:
             return OPERATION_MODE_AUTO
 
-        is_manual_intent = opt_overlay is True
+        # Within grace period: use optimistic operation mode if explicitly set
+        if opt_overlay is True:
+            opt_op_mode = self.tado_coordinator.optimistic.get_zone_operation_mode(
+                self._zone_id
+            )
+            if opt_op_mode is not None:
+                return opt_op_mode
+
         op_mode = str(self._resolve_state())
 
         state = self.coordinator.data.zone_states.get(str(self._zone_id))
         api_has_overlay = bool(state and getattr(state, "overlay_active", False))
 
-        return op_mode if api_has_overlay or is_manual_intent else OPERATION_MODE_AUTO
+        return (
+            op_mode if api_has_overlay or opt_overlay is True else OPERATION_MODE_AUTO
+        )
 
     def _get_actual_value(self) -> str:
         """Return actual operation mode from coordinator data."""

@@ -476,7 +476,17 @@
   "services": {
     "manual_poll": {
       "name": "Manueller Abruf",
-      "description": "Erzwingt eine sofortige Aktualisierung der Daten von der Tado API."
+      "description": "Erzwingt eine sofortige Aktualisierung der Daten von der Tado API. Mit entity_id wird nur das einzelne Gerät/Zone abgerufen (spart API-Quota).",
+      "fields": {
+        "refresh_type": {
+          "name": "Abruf-Typ",
+          "description": "Welche Daten aktualisiert werden sollen. Gezielte Typen (offsets, away, capabilities) unterstützen entity_id für einen günstigeren Einzelabruf."
+        },
+        "entity_id": {
+          "name": "Entity (optional)",
+          "description": "Schränkt den Abruf auf eine einzelne Entity ein. Unterstützt für: offsets, away, capabilities. Andere Typen fallen auf einen vollständigen Refresh zurück."
+        }
+      }
     },
     "resume_all_schedules": {
       "name": "Zeitpläne fortsetzen",

@@ -476,7 +476,17 @@
   "services": {
     "manual_poll": {
       "name": "Manual Poll",
-      "description": "Force an immediate update from the Tado API."
+      "description": "Force an immediate update from the Tado API. With entity_id, performs a targeted single-entity fetch (saves API quota).",
+      "fields": {
+        "refresh_type": {
+          "name": "Refresh Type",
+          "description": "Which data to refresh. Targeted types (offsets, away, capabilities) support entity_id for a cheaper single-entity fetch."
+        },
+        "entity_id": {
+          "name": "Entity (optional)",
+          "description": "Restrict the refresh to a single entity. Supported for: offsets, away, capabilities. Other types fall back to a full refresh."
+        }
+      }
     },
     "resume_all_schedules": {
       "name": "Resume All Schedules",

@@ -118,6 +118,25 @@ class EntityResolver:
             pass
         return None
 
+    def get_serial_from_entity(self, entity_id: str) -> str | None:
+        """Resolve a device serial number from a device entity ID.
+
+        Checks each known device serial against the entity's unique_id,
+        which handles both legacy ({serial}_{suffix}) and modern ({entry_id}_{suffix}_{serial}) formats.
+        """
+        ent_reg = er.async_get(self.hass)
+        if entry := ent_reg.async_get(entity_id):
+            return next(
+                (
+                    serial
+                    for serial in self.coordinator.data_manager.devices_meta
+                    if serial in entry.unique_id
+                ),
+                None,
+            )
+        else:
+            return None
+
     def is_zone_disabled(self, zone_id: int) -> bool:
         """Check if the zone control is disabled by user."""
         if not self.coordinator.config_entry:
@@ -128,5 +147,10 @@ class EntityResolver:
         if entity_id := ent_reg.async_get_entity_id("switch", DOMAIN, unique_id):
             entry = ent_reg.async_get(entity_id)
             if entry and entry.disabled:
+                _LOGGER.debug(
+                    "Zone %d excluded from bulk action: schedule switch %s is disabled",
+                    zone_id,
+                    entity_id,
+                )
                 return True
         return False

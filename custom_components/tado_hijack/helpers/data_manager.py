@@ -492,31 +492,34 @@ class TadoDataManager:
 
         _LOGGER.info("DataManager: Fetching offsets for %d devices", len(active))
 
-        # We need to cast to V3 Mapper to access the specific helper
+        for d in active:
+            await self._fetch_offset_for(d.serial_no)
+
+    async def _fetch_offset_for(self, serial: str) -> None:
+        """Fetch temperature offset for a single device (V3 only)."""
+        if not self.provider or self.coordinator.generation == GEN_X:
+            return
+
+        opt_val = self.coordinator.optimistic.get_offset(serial)
+        if opt_val is not None:
+            from tadoasync.models import TemperatureOffset
+
+            self.offsets_cache[serial] = TemperatureOffset(
+                celsius=float(opt_val), fahrenheit=0.0
+            )
+            _LOGGER.debug("Synced offset from optimistic for %s", serial)
+            return
+
         from .tadov3.mapper import TadoV3Mapper
 
         mapper = cast(TadoV3Mapper, self.provider)
-
-        for d in active:
-            # Sync from optimistic if available (grace period)
-            opt_val = self.coordinator.optimistic.get_offset(d.serial_no)
-            if opt_val is not None:
-                # Sync to cache (V3 model expects TemperatureOffset object)
-                from tadoasync.models import TemperatureOffset
-
-                self.offsets_cache[d.serial_no] = TemperatureOffset(
-                    celsius=float(opt_val), fahrenheit=0.0
-                )
-                _LOGGER.debug("Synced offset from optimistic for %s", d.serial_no)
-                continue
-
-            try:
-                off = await mapper.async_fetch_device_offset(d.serial_no)
-                self.offsets_cache[d.serial_no] = off
-            except TadoConnectionError as e:
-                _LOGGER.warning("Offset fail for %s: %s", d.short_serial_no, e)
-            except ValueError as e:
-                _LOGGER.warning("Offset parse fail for %s: %s", d.short_serial_no, e)
+        try:
+            off = await mapper.async_fetch_device_offset(serial)
+            self.offsets_cache[serial] = off
+        except TadoConnectionError as e:
+            _LOGGER.warning("Offset fail for %s: %s", serial, e)
+        except ValueError as e:
+            _LOGGER.warning("Offset parse fail for %s: %s", serial, e)
 
     async def _fetch_away_config(self) -> None:
         """Fetch away configuration (V3 only)."""
@@ -538,16 +541,69 @@ class TadoDataManager:
         _LOGGER.info("DataManager: Fetching away config for %d zones", len(active))
 
         for z in active:
-            # Sync from optimistic if available (grace period)
-            opt_val = self.coordinator.optimistic.get_away_temp(z.id)
-            if opt_val is not None:
-                self.away_cache[z.id] = float(opt_val)
-                _LOGGER.debug("Synced away config from optimistic for zone %d", z.id)
-                continue
+            await self._fetch_away_config_for(z.id)
 
-            try:
-                val = await self.provider.async_fetch_away_config(z.id)
-                if val is not None:
-                    self.away_cache[z.id] = val
-            except Exception as e:
-                _LOGGER.warning("Away config fail for zone %d: %s", z.id, e)
+    async def _fetch_away_config_for(self, zone_id: int) -> None:
+        """Fetch away configuration for a single zone (V3 only)."""
+        if not self.provider or self.coordinator.generation == GEN_X:
+            return
+
+        opt_val = self.coordinator.optimistic.get_away_temp(zone_id)
+        if opt_val is not None:
+            self.away_cache[zone_id] = float(opt_val)
+            _LOGGER.debug("Synced away config from optimistic for zone %d", zone_id)
+            return
+
+        try:
+            val = await self.provider.async_fetch_away_config(zone_id)
+            if val is not None:
+                self.away_cache[zone_id] = val
+        except Exception as e:
+            _LOGGER.warning("Away config fail for zone %d: %s", zone_id, e)
+
+    async def async_targeted_fetch(self, refresh_type: str, entity_id: str) -> bool:
+        """Fetch data for a specific entity without a full coordinator refresh.
+
+        Returns True if the fetch was targeted (no full refresh needed),
+        False if it fell back to cache invalidation (caller must trigger async_refresh).
+        """
+        if refresh_type == "offsets":
+            if serial := self.coordinator.entity_resolver.get_serial_from_entity(
+                entity_id
+            ):
+                await self._fetch_offset_for(serial)
+                return True
+            _LOGGER.warning(
+                "Targeted offset fetch: could not resolve serial for %s, falling back",
+                entity_id,
+            )
+            self.invalidate_cache("offsets")
+            return False
+
+        if refresh_type == "away":
+            zone_id = self.coordinator.get_zone_id_from_entity(entity_id)
+            if zone_id is not None:
+                await self._fetch_away_config_for(zone_id)
+                return True
+            _LOGGER.warning(
+                "Targeted away fetch: could not resolve zone for %s, falling back",
+                entity_id,
+            )
+            self.invalidate_cache("away")
+            return False
+
+        if refresh_type == "capabilities":
+            zone_id = self.coordinator.get_zone_id_from_entity(entity_id)
+            if zone_id is not None:
+                self.capabilities_cache.pop(zone_id, None)
+                await self.async_get_capabilities(zone_id)
+                return True
+            _LOGGER.warning(
+                "Targeted capabilities fetch: could not resolve zone for %s, falling back",
+                entity_id,
+            )
+            return False
+
+        # Bulk-only types (zone, metadata, presence, all): invalidate and signal full refresh
+        self.invalidate_cache(refresh_type)
+        return False
