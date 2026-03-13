@@ -1,3 +1,38 @@
+## [5.1.0](https://github.com/banter240/tado_hijack/compare/v5.0.2...v5.1.0) (2026-03-13)
+
+### ✨ New Features
+
+* feat: extend bulk zone actions to AC zones, targeted manual_poll fetch, and water heater fix
+
+feat(climate): extend bulk zone actions to include AC zones
+resume_all, turn_off_all and boost_all previously only targeted HEATING
+zones. AC zones (e.g. heat pumps) are now included in all bulk actions.
+Zone type is resolved automatically per zone from metadata so the correct
+overlay type is sent for both HEATING and AIR_CONDITIONING zones.
+HOT_WATER zones remain excluded.
+
+feat: targeted single-entity fetch for manual_poll
+Extends manual_poll service with optional entity_id to allow targeted,
+per-entity data refreshes instead of re-fetching all devices/zones:
+
+- offsets: 1 API call for the specific device (vs. N devices)
+- away_config: 1 API call for the specific zone (vs. N zones)
+- capabilities: uses existing lazy cache, drops only that zone's entry
+- bulk-only types (zone, metadata, presence, all): fall back to full refresh
+
+DRY approach: _fetch_offsets/_fetch_away_config now delegate per-entry
+work to _fetch_offset_for(serial) / _fetch_away_config_for(zone_id),
+which are also the targeted fetch paths. EntityResolver gains
+get_serial_from_entity() to resolve device entity → serial_no.
+
+Usage:
+  service: tado_hijack.manual_poll
+  data:
+    refresh_type: offsets
+    entity_id: number.bedroom_temperature_offset   # optional
+
+fix: add debug logging for bulk zone actions and fix water heater optimistic state
+
 ## [5.0.2](https://github.com/banter240/tado_hijack/compare/v5.0.1...v5.0.2) (2026-03-05)
 
 ### 🐛 Bug Fixes
