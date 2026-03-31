@@ -1,0 +1,137 @@
+name: Bug Report
+description: Something isn't working as expected
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Before You Submit
+        - Check [existing issues](https://github.com/banter240/tado_hijack/issues) - your bug might already be reported.
+        - Check the [FAQ & Troubleshooting](https://github.com/banter240/tado_hijack#troubleshooting) section in the README.
+        - Join [Discord](https://discord.gg/kxUsjHyxfT) for quick questions.
+
+  - type: dropdown
+    id: generation
+    attributes:
+      label: Tado Generation
+      description: Which hardware generation are you running? (Check the Tado app -> Settings -> Rooms & Devices)
+      options:
+        - V2 - GW Bridge (Internet Bridge GW01 / older gateway)
+        - V3 Classic - Internet Bridge IB01 (HomeKit-enabled)
+        - Tado X - Internet Bridge IB02 (Matter-enabled)
+        - Not sure
+    validations:
+      required: true
+
+  - type: dropdown
+    id: control_mode
+    attributes:
+      label: Temperature Control Mode
+      description: How are climate entities controlled in your setup?
+      options:
+        - HomeKit local control (V3 Classic - thermostats appear as HomeKit devices in HA)
+        - Matter local control (Tado X - thermostats appear as Matter devices in HA)
+        - Full Cloud Mode (climate entities via Tado Hijack cloud polling - V2 or opted-in V3/X)
+        - Not applicable / unsure
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Tado Hijack Version
+      description: >
+        Settings -> Devices & Services -> Tado Hijack -> three dots -> Integration information.
+        Or check HACS.
+      placeholder: "e.g. 5.2.0 or 5.2.0-dev.8"
+    validations:
+      required: true
+
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant Version
+      description: Settings -> System -> About
+      placeholder: "e.g. 2025.3.0"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_method
+    attributes:
+      label: Installation Method
+      options:
+        - HACS - stable release
+        - HACS - pre-release / dev channel
+        - Manual (copied files)
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What Happened?
+      description: Clear description of the bug. What did you observe, and when?
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What Did You Expect?
+      description: What should have happened instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Help us reproduce the issue consistently.
+      placeholder: |
+        1. ...
+        2. ...
+        3. See error / wrong behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics File
+      description: |
+        **This is the most useful thing you can provide.** The diagnostics file contains quota status, entity mappings, coordinator state, and more - all pre-redacted for privacy.
+
+        How to get it:
+        **Settings -> Devices & Services -> Tado Hijack -> three dots -> Download diagnostics**
+
+        Drag & drop the downloaded `.json` file directly into this field, or paste its contents.
+      placeholder: Drag & drop the diagnostics JSON file here, or paste its contents.
+    validations:
+      required: false
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Log Output
+      description: |
+        Paste relevant log lines or drag & drop a log file. To filter:
+        **Settings -> System -> Logs** - search for `tado_hijack`.
+
+        For more detail, add this to your `configuration.yaml` and restart:
+        ```yaml
+        logger:
+          logs:
+            custom_components.tado_hijack: debug
+        ```
+      placeholder: Drag & drop a log file here, or paste relevant log lines.
+    validations:
+      required: false
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Anything else that might be relevant - screenshots, automations that trigger the issue, unusual HA setup, etc.
+    validations:
+      required: false

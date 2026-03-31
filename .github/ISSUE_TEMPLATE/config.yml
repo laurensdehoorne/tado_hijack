@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discord (Quick Questions & Support)
+    url: https://discord.gg/kxUsjHyxfT
+    about: Join the Discord for quick questions, setup help, and general discussion.
+  - name: GitHub Discussions (Ideas & Q&A)
+    url: https://github.com/banter240/tado_hijack/discussions
+    about: Use Discussions for feature ideas, questions, and community help.
