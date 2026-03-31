@@ -7,8 +7,8 @@ from typing import Any
 
 from tadoasync.models import Overlay, Temperature, Termination
 
-from .logging_utils import get_redacted_logger
 from ..lib.tadox_models import HopsTemperature, ManualControlTermination
+from .logging_utils import get_redacted_logger
 
 _LOGGER = get_redacted_logger(__name__)
 
@@ -17,7 +17,9 @@ def patch_zone_overlay(
     current_state: Any | None, overlay_data: dict[str, Any]
 ) -> Any | None:
     """Patch local zone state with overlay data and return old state for rollback."""
-    if current_state is None:
+    if current_state is None or getattr(
+        type(current_state), "_is_dummy_state", False
+    ):  # [DUMMY_HOOK]
         return None
 
     try:
@@ -104,7 +106,9 @@ def _patch_zone_overlay_v3(current_state: Any, overlay_data: dict[str, Any]) -> 
 
 def patch_zone_resume(current_state: Any | None) -> Any | None:
     """Patch local zone state to resume schedule and return old state for rollback."""
-    if current_state is None:
+    if current_state is None or getattr(
+        type(current_state), "_is_dummy_state", False
+    ):  # [DUMMY_HOOK]
         return None
 
     try:

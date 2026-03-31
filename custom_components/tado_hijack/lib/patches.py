@@ -54,8 +54,52 @@ def apply_patches() -> None:
 
     patch_zone_state_deserialization()
     patch_version_string()
+    patch_set_meter_readings()
     _PATCHES_APPLIED = True
     _LOGGER.info("tadoasync patches applied successfully")
+
+
+def patch_set_meter_readings() -> None:
+    """Patch tadoasync set_meter_readings to include the required URI."""
+    try:
+        import orjson
+        import tadoasync.tadoasync
+        from tadoasync.const import HttpMethod
+
+        original_method = getattr(tadoasync.tadoasync.Tado, "set_meter_readings", None)
+        if not original_method:
+            _LOGGER.warning("Tado.set_meter_readings not found, cannot patch")
+            return
+
+        async def patched_set_meter_readings(
+            self: tadoasync.tadoasync.Tado, reading: int, date: datetime | None = None
+        ) -> None:
+            """Patched set_meter_readings that includes the URI."""
+
+            if date is None:
+                import homeassistant.util.dt as dt_util
+
+                date = dt_util.now()
+
+            payload = {"date": date.strftime("%Y-%m-%d"), "reading": reading}
+            response = await self._request(
+                uri=f"homes/{self._home_id}/meterReadings",
+                endpoint=tadoasync.tadoasync.EIQ_HOST_URL,
+                data=payload,
+                method=HttpMethod.POST,
+            )
+            data = orjson.loads(response)
+            if "message" in data:
+                from tadoasync.exceptions import TadoReadingError
+
+                raise TadoReadingError(
+                    f"Error setting meter reading: {data['message']}"
+                )
+
+        tadoasync.tadoasync.Tado.set_meter_readings = patched_set_meter_readings  # type: ignore[method-assign]
+        _LOGGER.debug("Successfully patched tadoasync Tado.set_meter_readings")
+    except Exception as e:
+        _LOGGER.error("Failed to patch set_meter_readings: %s", e)
 
 
 def patch_zone_state_deserialization() -> None:
@@ -129,10 +173,8 @@ def patch_zone_state_deserialization() -> None:
 
             return d
 
-        setattr(
-            tadoasync.models.ZoneState,
-            "__pre_deserialize__",
-            classmethod(patched_pre_deserialize),
+        tadoasync.models.ZoneState.__pre_deserialize__ = classmethod(  # type: ignore[method-assign, assignment]
+            patched_pre_deserialize
         )
         _LOGGER.debug("Successfully patched ZoneState.__pre_deserialize__")
 
@@ -170,7 +212,7 @@ def patch_version_string() -> None:
 
         # Update sys.modules cache if already imported
         if "tadoasync" in sys.modules:
-            setattr(sys.modules["tadoasync"], "VERSION", TADO_VERSION_PATCH)
+            sys.modules["tadoasync"].VERSION = TADO_VERSION_PATCH  # type: ignore[attr-defined]
 
     except ImportError as e:
         _LOGGER.warning("Failed to import tadoasync for version patch: %s", e)

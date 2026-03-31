@@ -24,6 +24,7 @@ from .models import TadoEntityDefinition
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
+
     from .coordinator import TadoDataUpdateCoordinator
 
 
@@ -69,12 +70,9 @@ class TadoOptimisticNumber(TadoOptimisticMixin, RestoreEntity, NumberEntity):
             val is not None
             and getattr(self, "_attr_suggested_display_precision", None) == 0
         ):
-            return int(round(float(val)))
+            return round(float(val))
 
         return float(val) if val is not None else None
-
-    def _get_actual_value(self) -> float | None:
-        raise NotImplementedError
 
 
 class TadoGenericNumberMixin(TadoDefinitionMixin):
@@ -129,7 +127,7 @@ class TadoGenericNumberMixin(TadoDefinitionMixin):
 
 
 class TadoGenericDeviceNumber(
-    TadoDeviceEntity, TadoGenericNumberMixin, TadoOptimisticNumber
+    TadoGenericNumberMixin, TadoOptimisticNumber, TadoDeviceEntity
 ):
     """Generic number for Device scope."""
 
@@ -141,6 +139,7 @@ class TadoGenericDeviceNumber(
         zone_id: int,
     ) -> None:
         """Initialize the generic device number."""
+        TadoOptimisticNumber.__init__(self)
         TadoDeviceEntity.__init__(
             self,
             coordinator,
@@ -156,7 +155,7 @@ class TadoGenericDeviceNumber(
 
 
 class TadoGenericZoneNumber(
-    TadoZoneEntity, TadoGenericNumberMixin, TadoOptimisticNumber
+    TadoGenericNumberMixin, TadoOptimisticNumber, TadoZoneEntity
 ):
     """Generic number for Zone scope."""
 
@@ -168,6 +167,7 @@ class TadoGenericZoneNumber(
         zone_name: str,
     ) -> None:
         """Initialize the generic zone number."""
+        TadoOptimisticNumber.__init__(self)
         TadoZoneEntity.__init__(
             self,
             coordinator,

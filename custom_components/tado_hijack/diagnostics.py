@@ -22,7 +22,6 @@ from .const import (
 )
 from .coordinator import TadoDataUpdateCoordinator
 from .helpers.logging_utils import redact
-from .helpers.quota_math import get_next_reset_time
 
 __all__ = ["async_get_config_entry_diagnostics"]
 
@@ -73,7 +72,7 @@ def _redact_pii(data: Any, coordinator: TadoDataUpdateCoordinator | None = None)
             # 2. Redact technical values based on key name
             if any(
                 x in k_lower
-                for x in {
+                for x in (
                     "homeid",
                     "userid",
                     "token",
@@ -85,13 +84,13 @@ def _redact_pii(data: Any, coordinator: TadoDataUpdateCoordinator | None = None)
                     "username",
                     "latitude",
                     "longitude",
-                }
+                )
             ):
                 # Hard redaction for these specific fields
                 new_data[new_key] = "**REDACTED**"
             elif any(
                 x in k_lower
-                for x in {"name", "title", "assigned_to", "firstname", "lastname"}
+                for x in ("name", "title", "assigned_to", "firstname", "lastname")
             ) and isinstance(v, str):
                 # If it's already a technical ID (like "Zone 30"), keep it
                 new_data[new_key] = v if v.startswith("Zone ") else "Anonymized Name"
@@ -197,19 +196,9 @@ def _get_quota_diagnostics(coordinator: TadoDataUpdateCoordinator) -> dict[str, 
     dm = coordinator.data_manager
     res_total, res_breakdown = dm.estimate_daily_reserved_cost()
 
-    expected_window = coordinator.reset_tracker.get_expected_window()
-    expected_hour = (
-        expected_window.hour if expected_window.confidence == "learned" else None
-    )
-    expected_minute = (
-        expected_window.minute if expected_window.confidence == "learned" else None
-    )
-
     # Timing calculations
     now_dt = dt_util.now()
-    next_reset = get_next_reset_time(
-        expected_hour, expected_minute, coordinator._last_quota_reset
-    )
+    next_reset = coordinator.reset_tracker.get_next_reset_time()
     seconds_until_reset = int((next_reset - now_dt).total_seconds())
     seconds_since_reset = SECONDS_PER_DAY - seconds_until_reset
     progress_done = max(0.0, min(1.0, seconds_since_reset / SECONDS_PER_DAY))
@@ -217,9 +206,10 @@ def _get_quota_diagnostics(coordinator: TadoDataUpdateCoordinator) -> dict[str, 
     # Usage calculations (not available as sensors)
     limit = getattr(coordinator.rate_limit, "limit", 0)
     remaining = getattr(coordinator.rate_limit, "remaining", 0)
-    expected_poll_usage = res_total * progress_done
+    polling_calls_today = coordinator._polling_calls_today
     actual_used = max(0, limit - remaining)
-    user_calls = max(0, actual_used - expected_poll_usage)
+    expected_bg = res_total * progress_done
+    user_calls = max(0, actual_used - polling_calls_today - expected_bg)
     threshold = getattr(coordinator.rate_limit, "throttle_threshold", 0)
 
     return {
@@ -229,7 +219,7 @@ def _get_quota_diagnostics(coordinator: TadoDataUpdateCoordinator) -> dict[str, 
         "reserved_24h": res_total,
         "reserved_breakdown": res_breakdown,
         "estimated_usage": {
-            "polling_so_far": int(expected_poll_usage),
+            "polling_so_far": polling_calls_today,
             "user_so_far": int(user_calls),
             "user_excess": int(max(0, user_calls - threshold)),
         },

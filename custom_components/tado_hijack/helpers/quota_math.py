@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Any, cast
+from typing import Any
 
 from homeassistant.util import dt as dt_util
 
 from ..const import (
     API_RESET_HOUR_START,
     API_RESET_MIN_PERCENT,
-    API_RESET_MIN_PLANNING_HOURS,
-    API_RESET_MIDPOINT_MINUTE,
     MIN_AUTO_QUOTA_INTERVAL_S,
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
@@ -67,79 +65,17 @@ def check_quota_reset(
     return remaining > last_remaining and (remaining / limit) >= min_reset_percent
 
 
-def get_next_reset_time(
-    expected_hour: int | None = None,
-    expected_minute: int | None = None,
-    last_reset: datetime | None = None,
-) -> datetime:
-    """Get the next expected quota reset time.
-
-    Strategy:
-    - If last_reset exists: Calculate based on last_reset + 24h with learned window
-    - If no last_reset (new installation): Use now + MIN_PLANNING_HOURS as initial value
-
-    Args:
-        expected_hour: Learned reset hour (None = use default 12)
-        expected_minute: Learned reset minute (None = use default 30)
-        last_reset: Last detected quota reset time (original, not normalized)
-
-    Returns:
-        Next expected quota reset time
-
-    """
-    berlin_tz = dt_util.get_time_zone("Europe/Berlin")
-    now_berlin = dt_util.now().astimezone(berlin_tz)
-
-    # Use learned window or fallback to default
-    reset_hour = expected_hour if expected_hour is not None else API_RESET_HOUR_START
-    reset_minute = (
-        expected_minute if expected_minute is not None else API_RESET_MIDPOINT_MINUTE
-    )
-
-    # No last reset (new installation): Use conservative initial estimate
-    if last_reset is None:
-        initial_estimate = now_berlin + timedelta(hours=API_RESET_MIN_PLANNING_HOURS)
-        return cast(
-            datetime,
-            initial_estimate.replace(minute=reset_minute, second=0, microsecond=0),
-        )
-
-    # Have last reset: Calculate next reset based on it
-    last_reset_berlin = last_reset.astimezone(berlin_tz)
-
-    # Next reset is last_reset + 24h, adjusted to learned window time
-    next_reset = (last_reset_berlin + timedelta(days=1)).replace(
-        hour=reset_hour,
-        minute=reset_minute,
-        second=0,
-        microsecond=0,
-    )
-
-    # If next reset already passed, add another day
-    if next_reset <= now_berlin:
-        next_reset = next_reset + timedelta(days=1)
-
-    return next_reset
-
-
-def get_seconds_until_reset(
-    expected_hour: int | None = None,
-    expected_minute: int | None = None,
-    last_reset: datetime | None = None,
-) -> int:
+def get_seconds_until_reset(next_reset: datetime) -> int:
     """Get seconds until next API quota reset.
 
     Args:
-        expected_hour: Learned reset hour (None = use default)
-        expected_minute: Learned reset minute (None = use default)
-        last_reset: Last detected quota reset time (if any)
+        next_reset: Next expected quota reset time
 
     Returns:
         Seconds until next reset
 
     """
-    reset_time = get_next_reset_time(expected_hour, expected_minute, last_reset)
-    return int((reset_time - dt_util.now()).total_seconds())
+    return int((next_reset - dt_util.now()).total_seconds())
 
 
 def calculate_remaining_polling_budget(
@@ -150,6 +86,7 @@ def calculate_remaining_polling_budget(
     auto_quota_percent: int,
     seconds_until_reset: int,
     safety_reserve: int = 0,
+    actual_polls_today: int = 0,
 ) -> float:
     """Calculate remaining API budget for the rest of the day.
 
@@ -161,6 +98,7 @@ def calculate_remaining_polling_budget(
         auto_quota_percent: Percentage of quota to use for polling
         seconds_until_reset: Seconds until next quota reset
         safety_reserve: API calls reserved for reset window (12-13h)
+        actual_polls_today: Actual integration poll calls since last reset
 
     Returns:
         Remaining budget for adaptive polling (excludes safety reserve)
@@ -169,7 +107,7 @@ def calculate_remaining_polling_budget(
     if remaining <= 0 or limit <= 0:
         return 0.0
 
-    progress_remaining = seconds_until_reset / SECONDS_PER_DAY
+    progress_remaining = min(1.0, max(0.0, seconds_until_reset / SECONDS_PER_DAY))
 
     base_daily_budget = (limit - background_cost_24h - throttle_threshold) * (
         auto_quota_percent / 100.0
@@ -181,9 +119,16 @@ def calculate_remaining_polling_budget(
     background_consumed = background_cost_24h * (1.0 - progress_remaining)
 
     # Raise the floor when external usage has consumed more than the reserved threshold.
-    expected_polling_consumed = base_daily_budget * (1.0 - progress_remaining)
-    inferred_external = max(
-        0.0, float(calls_consumed) - background_consumed - expected_polling_consumed
+    max_external = max(
+        0.0, float(limit) - base_daily_budget - float(background_cost_24h)
+    )
+    baseline_polling = max(
+        float(actual_polls_today),
+        base_daily_budget * (1.0 - progress_remaining),
+    )
+    inferred_external = min(
+        max_external,
+        max(0.0, float(calls_consumed) - background_consumed - baseline_polling),
     )
     effective_threshold = max(float(throttle_threshold), inferred_external)
 
@@ -195,11 +140,13 @@ def calculate_remaining_polling_budget(
     if max_daily_poll_budget <= 0:
         return 0.0
 
-    polling_consumed = max(0.0, float(calls_consumed) - background_consumed)
-    planned_budget = max(0.0, max_daily_poll_budget - polling_consumed)
+    polls_done = max(
+        0.0, float(calls_consumed) - background_consumed - inferred_external
+    )
+    planned_budget = max(0.0, max_daily_poll_budget - polls_done)
 
     future_bg = background_cost_24h * progress_remaining
-    available_now = max(0.0, remaining - throttle_threshold - future_bg)
+    available_now = max(0.0, remaining - effective_threshold - future_bg)
 
     budget = min(planned_budget, available_now)
     return max(0.0, budget - safety_reserve)
@@ -208,7 +155,9 @@ def calculate_remaining_polling_budget(
 def calculate_safety_reserve_interval(safety_reserve: int) -> int:
     """Calculate polling interval during reset window using safety reserve.
 
-    Safety reserve is distributed evenly during the reset window (12:00-13:00).
+    Safety reserve is distributed evenly across the active safe window.
+    is_in_reset_safe_window() activates ±1h around the expected hour,
+    giving a 3-hour window total (e.g. 12:xx-14:xx for expected hour 13).
 
     Args:
         safety_reserve: Number of API calls reserved for reset window
@@ -220,8 +169,8 @@ def calculate_safety_reserve_interval(safety_reserve: int) -> int:
     if safety_reserve <= 0:
         return SECONDS_PER_HOUR  # No safety reserve, use max interval
 
-    # Distribute safety reserve over 1 hour (reset window duration)
-    return SECONDS_PER_HOUR // safety_reserve
+    safe_window_seconds = 3 * SECONDS_PER_HOUR
+    return safe_window_seconds // safety_reserve
 
 
 def calculate_weighted_interval(
@@ -230,9 +179,7 @@ def calculate_weighted_interval(
     is_in_reduced_window_func: Any,
     reduced_window_conf: dict[str, Any],
     min_floor: int,
-    expected_hour: int | None = None,
-    expected_minute: int | None = None,
-    last_reset: datetime | None = None,
+    next_reset: datetime,
 ) -> int:
     """Calculate weighted interval for performance hours (reinvesting savings).
 
@@ -242,9 +189,7 @@ def calculate_weighted_interval(
         is_in_reduced_window_func: Function to check reduced window
         reduced_window_conf: Reduced polling configuration
         min_floor: Minimum allowed interval
-        expected_hour: Learned reset hour (None = use default)
-        expected_minute: Learned reset minute (None = use default)
-        last_reset: Last detected quota reset time (if any)
+        next_reset: Next expected quota reset time
 
     Returns:
         Calculated polling interval in seconds
@@ -252,7 +197,6 @@ def calculate_weighted_interval(
     """
     try:
         now = dt_util.now()
-        next_reset = get_next_reset_time(expected_hour, expected_minute, last_reset)
 
         # Calculate total normal and reduced seconds until next reset
         normal_seconds = 0

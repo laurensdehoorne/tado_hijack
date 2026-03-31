@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
+from ..const import CAPABILITY_INSIDE_TEMP, SERIAL_SHORT_LENGTH
 
 # --- Helper for nested activityDataPoints (v3 compatibility) ---
 
@@ -182,10 +183,23 @@ class TadoXDevice(BaseModel):
     characteristics: HopsCharacteristics = Field(default_factory=HopsCharacteristics)
     temperature_offset: float | None = Field(None, alias="temperatureOffset")
 
+    @model_validator(mode="after")
+    def _infer_capabilities(self) -> TadoXDevice:
+        """Infer v3-style capabilities from available device data fields."""
+        if self.temperature_offset is not None:
+            caps = self.characteristics.capabilities
+            if CAPABILITY_INSIDE_TEMP not in caps:
+                self.characteristics.capabilities = [*caps, CAPABILITY_INSIDE_TEMP]
+        return self
+
     @property
     def short_serial_no(self) -> str:
         """Return short serial number (last 6 characters) for device identification."""
-        return self.serial_no[-6:] if len(self.serial_no) >= 6 else self.serial_no
+        return (
+            self.serial_no[-SERIAL_SHORT_LENGTH:]
+            if len(self.serial_no) >= SERIAL_SHORT_LENGTH
+            else self.serial_no
+        )
 
     @property
     def connection_state(self) -> Any:

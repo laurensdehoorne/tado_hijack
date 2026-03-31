@@ -38,6 +38,14 @@ CONF_SUPPRESS_REDUNDANT_CALLS: Final = "suppress_redundant_calls"
 CONF_SUPPRESS_REDUNDANT_BUTTONS: Final = "suppress_redundant_buttons"
 CONF_INITIAL_POLL_DONE: Final = "initial_poll_done"
 
+# Feature Flags
+CONF_FEATURE_DEW_POINT: Final = "feature_dew_point"
+CONF_FEATURE_MOLD_DETECTION: Final = "feature_mold_detection"
+CONF_OUTDOOR_WEATHER_ENTITY: Final = "outdoor_weather_entity"
+CONF_VENTILATION_AH_THRESHOLD: Final = "ventilation_ah_threshold"
+CONF_ZONE_TEMP_ENTITIES: Final = "zone_temp_entities"
+CONF_ZONE_HUMIDITY_ENTITIES: Final = "zone_humidity_entities"
+
 # Logging Levels
 LOG_LEVELS: Final[list[str]] = ["DEBUG", "INFO", "WARNING", "ERROR"]
 DEFAULT_LOG_LEVEL: Final = "INFO"
@@ -73,6 +81,11 @@ DEFAULT_SUPPRESS_REDUNDANT_BUTTONS: Final = (
     False  # Opt-in button redundancy suppression
 )
 
+# Feature Flag Defaults (all on by default — zero cost when unused)
+DEFAULT_FEATURE_DEW_POINT: Final = True
+DEFAULT_FEATURE_MOLD_DETECTION: Final = True
+DEFAULT_VENTILATION_AH_THRESHOLD: Final = 1.0  # g/m³
+
 # Quota Safety Reserve Limits
 MIN_QUOTA_SAFETY_RESERVE: Final = 0  # 0 = disabled (not recommended)
 MAX_QUOTA_SAFETY_RESERVE: Final = 50
@@ -100,6 +113,12 @@ RESUME_REFRESH_DELAY_S: Final = (
     1.0  # Grace period to collect multiple resumes before refresh
 )
 INITIAL_RATE_LIMIT_GUESS: Final = 100  # Pessimistic initial guess
+MIN_OWD_TIMEOUT_MIN: Final = 5  # Minimum open window detection timeout in minutes
+MIN_OWD_TIMEOUT_S: Final = MIN_OWD_TIMEOUT_MIN * 60  # 300 seconds
+TEMP_TOLERANCE: Final = 0.1  # Tolerance for temperature float comparisons (degrees)
+TEMP_STRICT_TOLERANCE: Final = 0.01  # Strict tolerance for offset/away-temp checks
+HOME_ID_MIN_DIGITS: Final = 6  # Home IDs are 6+ digit integers
+SERIAL_SHORT_LENGTH: Final = 6  # Short serial number uses last 6 characters
 SLOW_POLL_CYCLE_S: Final = 86400  # 24 Hours in seconds
 
 # Zone Types
@@ -165,6 +184,7 @@ SERVICE_BOOST_ALL_ZONES = "boost_all_zones"
 SERVICE_SET_MODE = "set_mode"
 SERVICE_SET_MODE_ALL = "set_mode_all_zones"
 SERVICE_SET_WATER_HEATER_MODE = "set_water_heater_mode"
+SERVICE_ADD_METER_READING = "add_meter_reading"
 
 
 # Device Capabilities
