@@ -1,3 +1,16 @@
+## [5.3.0](https://github.com/banter240/tado_hijack/compare/v5.2.0...v5.3.0) (2026-04-03)
+
+### ✨ New Features
+
+* feat(tadox): sensor fixes, full diagnostics, and comprehensive documentation overhaul
+
+This commit consolidates multiple critical fixes and feature expansions across the integration:
+
+1. **Tado X Sensors & Fallbacks:**
+   - Fixed missing temperature fallback by allowing Tado X to read
+     `sensor_data_points.inside_temperature.value` from the cloud state via duck-typing.
+   - Fixed heating power sensor displaying an `unknown` state by correctly reading
+
 ## [5.2.0](https://github.com/banter240/tado_hijack/compare/v5.1.0...v5.2.0) (2026-04-01)
 
 ### ✨ New Features
