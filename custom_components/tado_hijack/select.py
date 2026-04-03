@@ -180,8 +180,7 @@ class TadoZoneTempSourceSelect(TadoZoneSourceSelectBase):
     (temperature sensor or climate entity) overrides the built-in zone state
     temperature used for dew point, mold risk and absolute humidity calculations.
 
-    GEN_CLASSIC default: cloud zone state sensor_data_points.inside_temperature
-    GEN_X default: None (cloud has no temp in Full-Matter mode → sensors unavailable)
+    Default (both gens): cloud zone state sensor_data_points.inside_temperature
     """
 
     _attr_icon = "mdi:thermometer"

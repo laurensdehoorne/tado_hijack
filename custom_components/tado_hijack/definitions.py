@@ -14,10 +14,13 @@ from .const import (
     CAPABILITY_INSIDE_TEMP,
     CONF_API_PROXY_URL,
     CONF_AUTO_API_QUOTA_PERCENT,
+    CONF_CALL_JITTER_ENABLED,
     CONF_DEBOUNCE_TIME,
     CONF_DISABLE_POLLING_WHEN_THROTTLED,
     CONF_FEATURE_DEW_POINT,
     CONF_FEATURE_MOLD_DETECTION,
+    CONF_FETCH_EXTENDED_DATA,
+    CONF_FULL_CLOUD_MODE,
     CONF_JITTER_PERCENT,
     CONF_LOG_LEVEL,
     CONF_MIN_AUTO_QUOTA_INTERVAL_S,
@@ -25,11 +28,13 @@ from .const import (
     CONF_OUTDOOR_WEATHER_ENTITY,
     CONF_PRESENCE_POLL_INTERVAL,
     CONF_PROXY_TOKEN,
+    CONF_QUOTA_SAFETY_RESERVE,
     CONF_REDUCED_POLLING_ACTIVE,
     CONF_REDUCED_POLLING_END,
     CONF_REDUCED_POLLING_INTERVAL,
     CONF_REDUCED_POLLING_START,
     CONF_REFRESH_AFTER_RESUME,
+    CONF_SCAN_INTERVAL,
     CONF_SLOW_POLL_INTERVAL,
     CONF_SUPPRESS_REDUNDANT_BUTTONS,
     CONF_SUPPRESS_REDUNDANT_CALLS,
@@ -46,6 +51,7 @@ from .const import (
     DEFAULT_MIN_AUTO_QUOTA_INTERVAL_S,
     DEFAULT_OFFSET_POLL_INTERVAL,
     DEFAULT_PRESENCE_POLL_INTERVAL,
+    DEFAULT_QUOTA_SAFETY_RESERVE,
     DEFAULT_REDUCED_POLLING_END,
     DEFAULT_REDUCED_POLLING_INTERVAL,
     DEFAULT_REDUCED_POLLING_START,
@@ -160,15 +166,17 @@ def _get_room_temp_celsius(c: Any, zid: int) -> float | None:
     ) is not None:
         return val
 
-    # GEN_CLASSIC fallback: read from zone state
-    if c.generation == GEN_CLASSIC:
-        if zone_state := c.data.zone_states.get(str(zid)):
-            if sdp := getattr(zone_state, "sensor_data_points", None):
-                inside_temp = getattr(sdp, "inside_temperature", None)
-                if inside_temp is not None:
-                    celsius = getattr(inside_temp, "celsius", None)
-                    if celsius is not None:
-                        return float(celsius)
+    # Fallback: read from zone state (both GEN_CLASSIC and GEN_X)
+    if zone_state := c.data.zone_states.get(str(zid)):
+        if sdp := getattr(zone_state, "sensor_data_points", None):
+            inside_temp = getattr(sdp, "inside_temperature", None)
+            if inside_temp is not None:
+                # GEN_CLASSIC uses .celsius, GEN_X uses .value
+                val = getattr(
+                    inside_temp, "celsius", getattr(inside_temp, "value", None)
+                )
+                if val is not None:
+                    return float(val)
     return None
 
 
@@ -1116,7 +1124,9 @@ ENTITY_DEFINITIONS: Final[list[TadoEntityDefinition]] = [
     create_zone_sensor(
         key="heating_power",
         supported_generations={GEN_X},
-        value_fn=lambda c, zid: _get_zone_sensor_data(c, zid, "heating_power"),
+        value_fn=lambda c, zid: tadox_parsers.parse_heating_power(
+            c.data.zone_states.get(str(zid))
+        ),
         unit="%",
         state_class=SensorStateClass.MEASUREMENT,
         unique_id_suffix="pwr",
@@ -1288,7 +1298,9 @@ ENTITY_DEFINITIONS: Final[list[TadoEntityDefinition]] = [
     ),
     create_home_binary_sensor(
         key="call_jitter_enabled",
-        value_fn=lambda c: bool(c.config_entry.data.get(CONF_API_PROXY_URL)),
+        value_fn=lambda c: bool(
+            c.config_entry.data.get(CONF_CALL_JITTER_ENABLED, False)
+        ),
         icon="mdi:waveform",
         entity_category=EntityCategory.DIAGNOSTIC,
     ),
@@ -1317,6 +1329,73 @@ ENTITY_DEFINITIONS: Final[list[TadoEntityDefinition]] = [
         ),
         icon="mdi:math-log",
     ),
+    create_diagnostic_sensor(
+        key="quota_safety_reserve",
+        value_fn=lambda c: int(
+            c.config_entry.data.get(
+                CONF_QUOTA_SAFETY_RESERVE, DEFAULT_QUOTA_SAFETY_RESERVE
+            )
+        ),
+        icon="mdi:shield-check",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    create_home_binary_sensor(
+        key="full_cloud_mode",
+        value_fn=lambda c: bool(c.config_entry.data.get(CONF_FULL_CLOUD_MODE, False)),
+        icon="mdi:cloud-check-variant",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    create_home_binary_sensor(
+        key="feature_dew_point",
+        value_fn=lambda c: bool(
+            c.config_entry.data.get(CONF_FEATURE_DEW_POINT, DEFAULT_FEATURE_DEW_POINT)
+        ),
+        icon="mdi:water-thermometer",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    create_home_binary_sensor(
+        key="feature_mold_detection",
+        value_fn=lambda c: bool(
+            c.config_entry.data.get(
+                CONF_FEATURE_MOLD_DETECTION, DEFAULT_FEATURE_MOLD_DETECTION
+            )
+        ),
+        icon="mdi:mushroom",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    create_diagnostic_sensor(
+        key="outdoor_weather_entity",
+        value_fn=lambda c: str(
+            c.config_entry.data.get(CONF_OUTDOOR_WEATHER_ENTITY, "None")
+        ),
+        icon="mdi:weather-partly-cloudy",
+    ),
+    create_diagnostic_sensor(
+        key="ventilation_ah_threshold",
+        value_fn=lambda c: float(
+            c.config_entry.data.get(
+                CONF_VENTILATION_AH_THRESHOLD, DEFAULT_VENTILATION_AH_THRESHOLD
+            )
+        ),
+        icon="mdi:window-open",
+        unit="g/m³",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
+    create_home_binary_sensor(
+        key="fetch_extended_data",
+        value_fn=lambda c: bool(
+            c.config_entry.data.get(CONF_FETCH_EXTENDED_DATA, False)
+        ),
+        icon="mdi:database-plus",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    create_diagnostic_sensor(
+        key="scan_interval",
+        value_fn=lambda c: int(c.config_entry.data.get(CONF_SCAN_INTERVAL, 1800)),
+        icon="mdi:update",
+        unit="s",
+        state_class=SensorStateClass.MEASUREMENT,
+    ),
     create_device_binary_sensor(
         key="battery_state",
         value_fn=lambda c, serial: bool(
@@ -1325,6 +1404,21 @@ ENTITY_DEFINITIONS: Final[list[TadoEntityDefinition]] = [
         ),
         device_class=BinarySensorDeviceClass.BATTERY,
         unique_id_suffix="bat",
+    ),
+    create_home_binary_sensor(
+        key="fetch_extended_data",
+        value_fn=lambda c: bool(
+            c.config_entry.data.get(CONF_FETCH_EXTENDED_DATA, False)
+        ),
+        icon="mdi:database-plus",
+        entity_category=EntityCategory.DIAGNOSTIC,
+    ),
+    create_diagnostic_sensor(
+        key="scan_interval",
+        value_fn=lambda c: int(c.config_entry.data.get(CONF_SCAN_INTERVAL, 1800)),
+        icon="mdi:update",
+        unit="s",
+        state_class=SensorStateClass.MEASUREMENT,
     ),
     create_device_binary_sensor(
         key="connection_state",

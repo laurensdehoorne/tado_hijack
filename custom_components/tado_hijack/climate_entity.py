@@ -214,18 +214,19 @@ class TadoClimateEntity(
         """Return current temperature."""
         state = self._current_state
         if state and state.sensor_data_points:
-            if temp := getattr(
-                state.sensor_data_points.inside_temperature, "celsius", None
-            ):
-                result = float(temp)
-                # Only log for real zones, skip dummy zones (998, 999)
-                if self._zone_id not in (DUMMY_ZONE_ID_AC, DUMMY_ZONE_ID_HOT_WATER):
-                    _LOGGER.debug(
-                        "Zone %d current_temperature: %s (from inside_temperature)",
-                        self._zone_id,
-                        result,
-                    )
-                return result
+            temp_obj = getattr(state.sensor_data_points, "inside_temperature", None)
+            if temp_obj is not None:
+                temp = getattr(temp_obj, "celsius", getattr(temp_obj, "value", None))
+                if temp is not None:
+                    result = float(temp)
+                    # Only log for real zones, skip dummy zones (998, 999)
+                    if self._zone_id not in (DUMMY_ZONE_ID_AC, DUMMY_ZONE_ID_HOT_WATER):
+                        _LOGGER.debug(
+                            "Zone %d current_temperature: %s (from inside_temperature)",
+                            self._zone_id,
+                            result,
+                        )
+                    return result
 
         if self._zone_id not in (DUMMY_ZONE_ID_AC, DUMMY_ZONE_ID_HOT_WATER):
             _LOGGER.debug("Zone %d current_temperature: None", self._zone_id)
