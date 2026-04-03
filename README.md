@@ -147,7 +147,7 @@ While other integrations waste your precious API quota for every tiny interactio
 
 > [!TIP]
 > **Maximum Fusion Scenario:**
-> Triggering a "Party Scene": **AC Living Room** (Temp + Fan + Swing) + **AC Kitchen** (Temp + Fan) + **Hot Water** (ON).
+> Triggering a "Party Scene": **AC living_room** (Temp + Fan + Swing) + **AC kitchen** (Temp + Fan) + **Hot Water** (ON).
 >
 > ❌ **Standard Integrations:** 6-8 API calls (Half your hourly quota gone).
 > ✅ **Tado Hijack:** **1 single API call** for everything.
@@ -472,10 +472,10 @@ Each zone device exposes two optional source selectors that override the data us
 | :------- | :------------------- | :---------------- |
 | **1. Select Entity** | Entity chosen in `select.zone_temp_source` | Entity chosen in `select.zone_humidity_source` |
 | **2. Connected Climate** | Associated Climate Entity (Full-Cloud or mapped HomeKit) | Tado Hijack Humidity Sensor (`sensor.X_humidity`) |
-| **3. Cloud API** | `sensor_data_points.inside_temperature` (v3 only) | `sensor_data_points.humidity` (All Gens) |
+| **3. Cloud API** | `sensor_data_points.inside_temperature` (All Gens) | `sensor_data_points.humidity` (All Gens) |
 
 > [!TIP]
-> For **Tado X**, Matter devices cannot be auto-linked because they do not expose serial numbers to Home Assistant. Therefore, the cloud API lacks room temperature. Link your Matter `climate` entity (e.g. `climate.schlafzimmer`) or a local temperature sensor via the `select.zone_temp_source` to activate dew point and mold risk sensors.
+> **For Tado X:** The integration falls back to cloud temperature data out-of-the-box. However, because Matter devices hide their serial numbers in Home Assistant, they cannot be auto-linked like v3 HomeKit devices. We **highly recommend** manually linking your Matter `climate` entity (e.g., `climate.living_room`) via the `select.zone_temp_source`. This ensures your indoor climate sensors update in real-time via local Matter push updates, rather than waiting for slower API polling.
 
 > [!NOTE]
 > For **v3 Classic**, linking sources is **optional**. The built-in HomeKit linkage and zone state provides both temperature and humidity automatically. Link an external sensor only if you want higher precision or a different measurement point.
@@ -726,7 +726,7 @@ data:
 
 <br>
 
-**Quick Bathroom Heat (15 Min at 24°C):**
+**Quick bathroom Heat (15 Min at 24°C):**
 
 ```yaml
 service: tado_hijack.set_mode
@@ -902,7 +902,7 @@ In the **default mode**, Tado Hijack does **not** create `climate` entities for 
 
 For Tado X (without Full Cloud Mode), the cloud API does not deliver room temperature because the TRV measures it locally and reports it directly via Matter. Since Matter devices do not expose serial numbers in Home Assistant, Tado Hijack cannot auto-link them.
 
-You **must** use the **Temperature Source** selector (`select.zone_temp_source`) on your Tado X zone device and select the corresponding Matter `climate` entity or a temperature sensor (e.g. `climate.schlafzimmer_tado`). Once set, the dew point, mold risk, and absolute humidity sensors activate for that zone immediately.
+You **must** use the **Temperature Source** selector (`select.zone_temp_source`) on your Tado X zone device and select the corresponding Matter `climate` entity or a temperature sensor (e.g. `climate.living_room_tado`). Once set, the dew point, mold risk, and absolute humidity sensors activate for that zone immediately.
 
 See [Zone Temperature & Humidity Sources](#zone-temperature--humidity-sources-all-generations) for details.
 
