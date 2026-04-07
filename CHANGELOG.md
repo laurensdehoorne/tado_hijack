@@ -1,3 +1,46 @@
+## [5.4.0](https://github.com/banter240/tado_hijack/compare/v5.3.0...v5.4.0) (2026-04-07)
+
+### ✨ New Features
+
+* feat(core): presence mode select, redundancy checker fix, version logging, and climate fixes
+
+Replaces the binary away_mode switch with a three-option presence_mode
+select entity, fixes false-positive redundancy drops that silently
+blocked hot water and zone overlays, adds toggleable version prefixing
+in logs, and restores auto_target_temperature for heating zones.
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🏠 PRESENCE MODE SELECT ENTITY
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Replaces binary away_mode switch with select.tado_{home}_presence_mode:
+- HOME: PUT presenceLock with homePresence=HOME
+- AWAY: PUT presenceLock with homePresence=AWAY
+- AUTO: DELETE presenceLock (restores Tado geofencing)
+
+AUTO was previously inaccessible from HA, requiring manual API interaction
+to restore automatic presence detection after a manual override.
+
+Update automations targeting the old switch to use select.select_option:
+
+  target:
+    entity_id: select.tado_{home}_presence_mode
+  data:
+    option: home   # or: away / auto
+
+Migration:
+- Extracted all migration steps from __init__.py into helpers/migration.py;
+  async_migrate_entry replaced with a simple loop over MIGRATION_STEPS.
+- Migration v8 removes the legacy away_mode switch from the entity registry.
+- Migration v9 re-runs the removal for installs where dev.1 already set
+  VERSION=8, causing v8 to never execute.
+- Config flow VERSION bumped to 9.
+- Entity ID fix: was using bridge serial instead of home slug.
+
+Note: restoring AUTO presence requires a Tado Auto-Assist subscription.
+A persistent notification with the home name is shown if the API returns
+HTTP 422 (Auto-Assist not available).
+
 ## [5.3.0](https://github.com/banter240/tado_hijack/compare/v5.2.0...v5.3.0) (2026-04-03)
 
 ### ✨ New Features
