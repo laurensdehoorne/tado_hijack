@@ -2,11 +2,20 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
+from pathlib import Path
 from typing import Any
 
 from ..const import HOME_ID_MIN_DIGITS
+
+try:
+    INTEGRATION_VERSION = json.loads(
+        (Path(__file__).parent.parent / "manifest.json").read_text()
+    ).get("version", "unknown")
+except Exception:
+    INTEGRATION_VERSION = "unknown"
 
 # Common sensitive URL parameter patterns for Tado
 _URL_PARAM_PATTERNS = [
@@ -44,8 +53,12 @@ def redact(data: Any) -> Any:
     for p in _URL_PARAM_PATTERNS:
         data = p.sub(lambda m: m.group(0).split("=")[0] + "=REDACTED", data)
 
-    # Home IDs in URLs
-    data = re.sub(r"homes/\d+", "homes/REDACTED", data, flags=re.IGNORECASE)
+    # Home IDs in URLs and error messages ("homes/12345" or "home 12345")
+    data = re.sub(r"homes?/\d+", "homes/REDACTED", data, flags=re.IGNORECASE)
+    data = re.sub(r"\bhome\s+\d{4,}", "home REDACTED", data, flags=re.IGNORECASE)
+
+    # Email addresses (inline, not just key=value form)
+    data = re.sub(r"[\w.+-]+@[\w.-]+\.\w+", "REDACTED@REDACTED", data)
 
     # Serial Numbers (Tado format: 2 letters + 10 digits)
     def partial_redact_sn(m: re.Match[str]) -> str:
@@ -73,6 +86,20 @@ def redact(data: Any) -> Any:
 
 
 _LOGGER = logging.getLogger(__name__)
+
+
+_VERSION_PREFIX_ENABLED: bool = True
+_VERSION_PREFIX = f"[v{INTEGRATION_VERSION}] "
+
+
+class TadoVersionFilter(logging.Filter):
+    """Prepend integration version to every log message when enabled."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        """Prepend version tag to the log message."""
+        if _VERSION_PREFIX_ENABLED and isinstance(record.msg, str):
+            record.msg = _VERSION_PREFIX + record.msg
+        return True
 
 
 class TadoRedactionFilter(logging.Filter):
@@ -107,12 +134,22 @@ _CURRENT_INTEGRATION_LOG_LEVEL: int = logging.INFO
 
 
 def get_redacted_logger(name: str) -> logging.Logger:
-    """Get a logger with the redaction filter attached."""
+    """Get a logger with version and redaction filters attached."""
     logger = logging.getLogger(name)
-    logger.addFilter(TadoRedactionFilter())
+    existing = {type(f) for f in logger.filters}
+    if TadoVersionFilter not in existing:
+        logger.addFilter(TadoVersionFilter())
+    if TadoRedactionFilter not in existing:
+        logger.addFilter(TadoRedactionFilter())
     if name.startswith("custom_components.tado_hijack"):
         logger.setLevel(_CURRENT_INTEGRATION_LOG_LEVEL)
     return logger
+
+
+def set_version_prefix_enabled(enabled: bool) -> None:
+    """Enable or disable version prefix injection in log messages."""
+    global _VERSION_PREFIX_ENABLED
+    _VERSION_PREFIX_ENABLED = enabled
 
 
 def set_redacted_log_level(level: str) -> None:

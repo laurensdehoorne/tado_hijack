@@ -258,11 +258,22 @@ class TadoApiManager:
         # Filter redundant operations BEFORE sending (Toggle 1 - State Changes)
         from .redundancy_checker import filter_redundant_merged_data
 
-        suppress_enabled = getattr(self.coordinator, "_suppress_redundant_calls", False)
-        if suppress_enabled and hasattr(self.coordinator, "action_provider"):
+        if suppress_enabled := getattr(
+            self.coordinator, "_suppress_redundant_calls", False
+        ):
+            # Use pre-patch states from rollback_context: zone_states in coordinator.data
+            # are already mutated by state_patcher before queuing, so they reflect the
+            # target — not the device state we should compare against.
+            pre_patch_states: dict[str, Any] = {
+                str(cmd.zone_id): cmd.rollback_context
+                for cmd in commands
+                if cmd.cmd_type == CommandType.SET_OVERLAY
+                and cmd.zone_id is not None
+                and cmd.rollback_context is not None
+            }
             merged = filter_redundant_merged_data(
                 merged,
-                self.coordinator.action_provider,
+                pre_patch_states,
                 self.coordinator.optimistic,
                 suppress_enabled,
             )
@@ -283,7 +294,9 @@ class TadoApiManager:
             )
             if is_empty:
                 _LOGGER.info(
-                    "All operations redundant after filtering, skipping API call"
+                    "Skipping API call: all %d command(s) redundant after filtering (%s)",
+                    len(commands),
+                    [cmd.cmd_type.value for cmd in commands],
                 )
                 return
 

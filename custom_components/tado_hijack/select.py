@@ -12,7 +12,7 @@ from .const import (
     CONF_ZONE_HUMIDITY_ENTITIES,
     CONF_ZONE_TEMP_ENTITIES,
 )
-from .entity import TadoGenericEntityMixin, TadoZoneEntity
+from .entity import TadoGenericEntityMixin, TadoHomeEntity, TadoZoneEntity
 from .helpers.discovery import yield_zones
 from .helpers.entity_setup import async_setup_generic_platform
 from .helpers.logging_utils import get_redacted_logger
@@ -40,6 +40,7 @@ async def async_setup_entry(
         async_add_entities,
         "select",
         {
+            "home": TadoGenericHomeSelect,
             "zone": TadoGenericZoneSelect,
         },
     )
@@ -56,6 +57,46 @@ async def async_setup_entry(
         )
     if source_entities:
         async_add_entities(source_entities)
+
+
+class TadoGenericHomeSelect(TadoHomeEntity, TadoGenericEntityMixin, SelectEntity):
+    """Generic select for Home scope."""
+
+    def __init__(
+        self,
+        coordinator: TadoDataUpdateCoordinator,
+        definition: TadoEntityDefinition,
+    ) -> None:
+        """Initialize the generic home select."""
+        TadoHomeEntity.__init__(
+            self, coordinator, cast(str, definition["translation_key"])
+        )
+        TadoGenericEntityMixin.__init__(self, definition)
+        self._set_entity_id("select", definition["key"])
+        self._option_map: dict[str, str] = {}
+        if options_fn := definition.get("options_fn"):
+            raw_options: list[str] = options_fn(coordinator)
+            self._option_map = {opt.lower(): opt for opt in raw_options}
+        self._attr_options: list[str] = sorted(self._option_map.keys())
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the current selected option."""
+        val = self._get_actual_value()
+        if val is not None:
+            val_lower = str(val).lower()
+            if val_lower in self._attr_options:
+                return val_lower
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        api_value = self._option_map.get(option)
+        if api_value is None:
+            _LOGGER.error("Invalid option selected: %s", option)
+            return
+        await self._async_select_option(api_value)
+        self.async_write_ha_state()
 
 
 class TadoGenericZoneSelect(TadoZoneEntity, TadoGenericEntityMixin, SelectEntity):

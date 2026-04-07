@@ -21,6 +21,7 @@ CONF_OFFSET_POLL_INTERVAL: Final = "offset_poll_interval"
 CONF_THROTTLE_THRESHOLD: Final = "throttle_threshold"
 CONF_DISABLE_POLLING_WHEN_THROTTLED: Final = "disable_polling_when_throttled"
 CONF_LOG_LEVEL: Final = "log_level"
+CONF_LOG_VERSION_PREFIX: Final = "log_version_prefix"
 CONF_DEBOUNCE_TIME: Final = "debounce_time"
 CONF_API_PROXY_URL: Final = "api_proxy_url"
 CONF_PROXY_TOKEN: Final = "proxy_token"
@@ -49,6 +50,7 @@ CONF_ZONE_HUMIDITY_ENTITIES: Final = "zone_humidity_entities"
 # Logging Levels
 LOG_LEVELS: Final[list[str]] = ["DEBUG", "INFO", "WARNING", "ERROR"]
 DEFAULT_LOG_LEVEL: Final = "INFO"
+DEFAULT_LOG_VERSION_PREFIX: Final = True
 
 # [DUMMY_HOOK]
 # Enable dummy zones for development/testing via environment variable
@@ -56,6 +58,18 @@ DEFAULT_LOG_LEVEL: Final = "INFO"
 CONF_ENABLE_DUMMY_ZONES: Final = (
     os.getenv("TADO_ENABLE_DUMMIES", "false").lower() == "true"
 )
+
+# API Limits & Thresholds
+API_QUOTA_STANDARD: Final = 1000
+API_QUOTA_PROXY: Final = 3000
+
+# HTTP Status Codes
+HTTP_BAD_REQUEST: Final = 400
+HTTP_UNAUTHORIZED: Final = 401
+HTTP_FORBIDDEN: Final = 403
+HTTP_NOT_FOUND: Final = 404
+HTTP_UNPROCESSABLE_ENTITY: Final = 422
+HTTP_TOO_MANY_REQUESTS: Final = 429
 
 # Hardware Generations
 GEN_CLASSIC: Final = "classic"  # V2/V3 (GW/IB01/GW01) - Classic API

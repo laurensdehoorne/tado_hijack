@@ -41,6 +41,7 @@ from .const import (
     CONF_GENERATION,
     CONF_JITTER_PERCENT,
     CONF_LOG_LEVEL,
+    CONF_LOG_VERSION_PREFIX,
     CONF_MIN_AUTO_QUOTA_INTERVAL_S,
     CONF_OFFSET_POLL_INTERVAL,
     CONF_OUTDOOR_WEATHER_ENTITY,
@@ -64,6 +65,7 @@ from .const import (
     DEFAULT_FEATURE_MOLD_DETECTION,
     DEFAULT_JITTER_PERCENT,
     DEFAULT_LOG_LEVEL,
+    DEFAULT_LOG_VERSION_PREFIX,
     DEFAULT_MIN_AUTO_QUOTA_INTERVAL_S,
     DEFAULT_OFFSET_POLL_INTERVAL,
     DEFAULT_PRESENCE_POLL_INTERVAL,
@@ -181,6 +183,7 @@ class TadoHijackCommonFlow:
                 CONF_JITTER_PERCENT,
                 CONF_DEBOUNCE_TIME,
                 CONF_LOG_LEVEL,
+                CONF_LOG_VERSION_PREFIX,
             ],
             "features": [
                 CONF_FEATURE_DEW_POINT,
@@ -481,6 +484,13 @@ class TadoHijackCommonFlow:
                                     mode=SelectSelectorMode.DROPDOWN,
                                 )
                             ),
+                            vol.Required(
+                                CONF_LOG_VERSION_PREFIX,
+                                default=self._get_current_data(
+                                    CONF_LOG_VERSION_PREFIX,
+                                    DEFAULT_LOG_VERSION_PREFIX,
+                                ),
+                            ): BooleanSelector(),
                         }
                     ),
                     {"collapsed": True},
@@ -513,7 +523,7 @@ class TadoHijackConfigFlow(
 ):  # type: ignore[call-arg]
     """Handle a config flow for Tado Hijack."""
 
-    VERSION = 8
+    VERSION = 9
     login_task: asyncio.Task[Any] | None = None
     refresh_token: str | None = None
     tado: Tado | None = None

@@ -348,6 +348,18 @@ class TadoClimateEntity(
             ac_mode=ac_mode,
         )
 
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Return entity specific state attributes including memory."""
+        attrs = super().extra_state_attributes
+
+        if self.hvac_mode == HVACMode.AUTO:
+            state = self._current_state
+            temp = parse_schedule_temperature(state)
+            attrs["auto_target_temperature"] = float(temp) if temp is not None else None
+
+        return attrs
+
 
 class TadoAirConditioning(TadoClimateEntity):
     """Climate entity for Air Conditioning control."""
@@ -397,19 +409,6 @@ class TadoAirConditioning(TadoClimateEntity):
     def _get_defaults_v3(self) -> tuple[float, float]:
         """Get defaults for v3 Classic (AC specific)."""
         return TEMP_DEFAULT_AC, TEMP_MIN_AC
-
-    @property
-    def extra_state_attributes(self) -> dict[str, Any]:
-        """Return entity specific state attributes including memory."""
-        attrs = super().extra_state_attributes
-
-        # Recovery of the target temperature of the planning in AUTO mode
-        if self.hvac_mode == HVACMode.AUTO:
-            state = self._current_state
-            temp = parse_schedule_temperature(state)
-            attrs["auto_target_temperature"] = float(temp) if temp is not None else None
-
-        return attrs
 
     def _get_active_hvac_mode(self) -> HVACMode:
         """Return hvac mode when power is ON based on current state."""

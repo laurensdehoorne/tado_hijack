@@ -12,24 +12,27 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from tadoasync import TadoAuthenticationError
 
 from .const import (
+    API_QUOTA_STANDARD,
     CONF_API_PROXY_URL,
     CONF_INITIAL_POLL_DONE,
     CONF_LOG_LEVEL,
-    CONF_PRESENCE_POLL_INTERVAL,
+    CONF_LOG_VERSION_PREFIX,
     CONF_PROXY_TOKEN,
     CONF_REFRESH_TOKEN,
-    CONF_SLOW_POLL_INTERVAL,
     DEFAULT_LOG_LEVEL,
-    DEFAULT_PRESENCE_POLL_INTERVAL,
+    DEFAULT_LOG_VERSION_PREFIX,
     DEFAULT_SCAN_INTERVAL,
-    DEFAULT_SLOW_POLL_INTERVAL,
+    HTTP_BAD_REQUEST,
+    HTTP_UNAUTHORIZED,
 )
 from .coordinator import TadoDataUpdateCoordinator
 from .helpers.client import TadoHijackClient
 from .helpers.logging_utils import (
+    INTEGRATION_VERSION,
     TadoRedactionFilter,
     get_redacted_logger,
     set_redacted_log_level,
+    set_version_prefix_enabled,
 )
 from .lib.patches import apply_patches
 from .services import async_setup_services, async_unload_services
@@ -61,81 +64,15 @@ PLATFORMS: list[Platform] = [
 
 async def async_migrate_entry(hass: HomeAssistant, entry: TadoConfigEntry) -> bool:
     """Migrate old entry."""
+    from .helpers.migration import MIGRATION_STEPS
+
     _LOGGER.debug("Migrating from version %s", entry.version)
 
-    if entry.version == 1:
-        entry.version = 2
-
-    if entry.version == 2:  # noqa: PLR2004
-        # scan_interval fix
-        new_data = {**entry.data}
-        if new_data.get(CONF_SCAN_INTERVAL) == DEFAULT_SCAN_INTERVAL:
-            _LOGGER.info("Migrating scan_interval to 3600s (v3)")
-            new_data[CONF_SCAN_INTERVAL] = 3600
-        hass.config_entries.async_update_entry(entry, data=new_data, version=3)
-
-    if entry.version == 3:  # noqa: PLR2004
-        # Introduction of Presence Polling
-        new_data = {**entry.data}
-        if CONF_PRESENCE_POLL_INTERVAL not in new_data:
-            _LOGGER.info("Introducing presence_poll_interval (v4)")
-            new_data[CONF_PRESENCE_POLL_INTERVAL] = new_data.get(
-                CONF_SCAN_INTERVAL, DEFAULT_PRESENCE_POLL_INTERVAL
-            )
-        hass.config_entries.async_update_entry(entry, data=new_data, version=4)
-
-    if entry.version == 4:  # noqa: PLR2004
-        # Cleanup of legacy hot water entities
-        _LOGGER.info("Migrating to version 5: Cleaning up legacy hot water entities")
-        from homeassistant.helpers import entity_registry as er
-
-        ent_reg = er.async_get(hass)
-        entries = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
-        for entity in entries:
-            if "_hw_" in entity.unique_id or "_climate_hw_" in entity.unique_id:
-                _LOGGER.info(
-                    "Removing legacy entity %s (unique_id: %s)",
-                    entity.entity_id,
-                    entity.unique_id,
-                )
-                ent_reg.async_remove(entity.entity_id)
-
-        hass.config_entries.async_update_entry(entry, version=5)
-
-    if entry.version < 6:  # noqa: PLR2004
-        # Reset intervals to defaults to fix unit confusion
-        _LOGGER.info("Migrating to version 6: Resetting intervals to defaults")
-        new_data = {
-            **entry.data,
-            CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,  # gitleaks:allow
-        }
-        new_data[CONF_PRESENCE_POLL_INTERVAL] = (
-            DEFAULT_PRESENCE_POLL_INTERVAL  # gitleaks:allow
-        )
-        new_data[CONF_SLOW_POLL_INTERVAL] = DEFAULT_SLOW_POLL_INTERVAL  # gitleaks:allow
-        hass.config_entries.async_update_entry(entry, data=new_data, version=6)
-
-    if entry.version < 7:  # noqa: PLR2004
-        # Cleanup open window detection switch entities (replaced by number)
-        _LOGGER.info(
-            "Migrating to version 7: Cleaning up legacy open window detection switch entities"
-        )
-        from homeassistant.helpers import entity_registry as er
-
-        ent_reg = er.async_get(hass)
-        entries = er.async_entries_for_config_entry(ent_reg, entry.entry_id)
-        for e in entries:
-            if e.domain == "switch" and (
-                "open_window_detection" in e.unique_id or "owd" in e.unique_id
-            ):
-                _LOGGER.info(
-                    "Removing legacy open window detection entity %s (unique_id: %s)",
-                    e.entity_id,
-                    e.unique_id,
-                )
-                ent_reg.async_remove(e.entity_id)
-
-        hass.config_entries.async_update_entry(entry, version=7)
+    for target_version, step in MIGRATION_STEPS:
+        if entry.version < target_version:
+            _LOGGER.info("Migrating to version %s", target_version)
+            step(hass, entry)
+            hass.config_entries.async_update_entry(entry, version=target_version)
 
     _LOGGER.info("Migration to version %s successful", entry.version)
     return True
@@ -157,8 +94,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: TadoConfigEntry) -> bool
     log_level = entry.options.get(CONF_LOG_LEVEL) or entry.data.get(
         CONF_LOG_LEVEL, DEFAULT_LOG_LEVEL
     )
+    log_version_prefix = entry.options.get(
+        CONF_LOG_VERSION_PREFIX,
+        entry.data.get(CONF_LOG_VERSION_PREFIX, DEFAULT_LOG_VERSION_PREFIX),
+    )
 
     set_redacted_log_level(log_level)
+    set_version_prefix_enabled(bool(log_version_prefix))
+
+    from .const import CONF_GENERATION, GEN_CLASSIC
+
+    _LOGGER.info(
+        "Tado Hijack %s starting (Generation: %s)",
+        INTEGRATION_VERSION,
+        entry.data.get(CONF_GENERATION, GEN_CLASSIC),
+    )
 
     if proxy_url:
         _LOGGER.info("Using Tado API Proxy at %s", proxy_url)
@@ -190,21 +140,18 @@ async def async_setup_entry(hass: HomeAssistant, entry: TadoConfigEntry) -> bool
         error_str = str(e).lower()
         if (
             "bad request" in error_str
-            or "400" in error_str
-            or "401" in error_str
+            or str(HTTP_BAD_REQUEST) in error_str
+            or str(HTTP_UNAUTHORIZED) in error_str
             or "unauthorized" in error_str
             or ("invalid" in error_str and "token" in error_str)
         ):
             _LOGGER.warning(
-                "Token likely invalid (HTTP 400/401 or auth error), triggering reauth"
+                "Token likely invalid (HTTP %s/%s or auth error), triggering reauth",
+                HTTP_BAD_REQUEST,
+                HTTP_UNAUTHORIZED,
             )
             raise ConfigEntryAuthFailed from e
         raise ConfigEntryNotReady from e
-
-    from .const import CONF_GENERATION, GEN_CLASSIC
-
-    gen = entry.data.get(CONF_GENERATION, GEN_CLASSIC)
-    _LOGGER.info("Setting up Tado Hijack entry: %s (Generation: %s)", entry.title, gen)
 
     coordinator = TadoDataUpdateCoordinator(hass, entry, client, scan_interval)
     await coordinator.async_setup()
@@ -212,7 +159,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: TadoConfigEntry) -> bool
 
     if (
         not entry.data.get(CONF_INITIAL_POLL_DONE)
-        and coordinator.rate_limit.limit >= 1000  # noqa: PLR2004
+        and coordinator.rate_limit.limit >= API_QUOTA_STANDARD
     ):
         _LOGGER.info(
             "Performing initial full poll (Limit: %d)", coordinator.rate_limit.limit

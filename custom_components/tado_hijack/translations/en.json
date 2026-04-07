@@ -130,6 +130,18 @@
       },
       "tado_generation": {
         "name": "Hardware Generation"
+      },
+      "quota_safety_reserve": {
+        "name": "API Quota Safety Reserve"
+      },
+      "outdoor_weather_entity": {
+        "name": "Outdoor Weather Source"
+      },
+      "ventilation_ah_threshold": {
+        "name": "Ventilation AH Threshold"
+      },
+      "scan_interval": {
+        "name": "Scan Interval"
       }
     },
     "binary_sensor": {
@@ -175,12 +187,21 @@
       },
       "refresh_after_resume": {
         "name": "Refresh After Resume"
+      },
+      "fetch_extended_data": {
+        "name": "Fetch Extended Data"
+      },
+      "feature_dew_point": {
+        "name": "Dew Point Feature"
+      },
+      "feature_mold_detection": {
+        "name": "Mold Detection Feature"
+      },
+      "full_cloud_mode": {
+        "name": "Full Cloud Mode"
       }
     },
     "switch": {
-      "away_mode": {
-        "name": "Away Mode"
-      },
       "polling_active": {
         "name": "Global Polling"
       },
@@ -256,6 +277,14 @@
       }
     },
     "select": {
+      "presence_mode": {
+        "name": "Presence Mode",
+        "state": {
+          "home": "Home",
+          "away": "Away",
+          "auto": "Auto"
+        }
+      },
       "zone_temp_source": {
         "name": "Temperature Source"
       },
@@ -418,7 +447,8 @@
               "call_jitter_enabled": "Enable Call Jitter (Proxy)",
               "jitter_percent": "Jitter Strength (+/- %)",
               "debounce_time": "Debounce Time (Seconds)",
-              "log_level": "Log Level"
+              "log_level": "Log Level",
+              "log_version_prefix": "Show Version in Logs"
             },
             "data_description": {
               "api_proxy_url": "Advanced: Base URL of a local tado-api-proxy instance. Do NOT include /api/v2. See README for details.",
@@ -426,7 +456,8 @@
               "call_jitter_enabled": "Adds random delays before API calls to obfuscate automation patterns. Only effective when using a proxy.",
               "jitter_percent": "Strength of random variation for polls and calls. Default 10% (e.g. 60s -> 54-66s).",
               "debounce_time": "Time window to collect rapid changes before sending to API. Default 5s.",
-              "log_level": "Controls the verbosity of the logs. DEBUG shows all API interactions (masked), INFO shows important system events."
+              "log_level": "Controls the verbosity of the logs. DEBUG shows all API interactions (masked), INFO shows important system events.",
+              "log_version_prefix": "Prepends [vX.Y.Z] to every log message from this integration. Makes the running version immediately visible in any log snippet."
             }
           }
         }
@@ -523,7 +554,8 @@
               "call_jitter_enabled": "Enable Call Jitter (Proxy)",
               "jitter_percent": "Jitter Strength (+/- %)",
               "debounce_time": "Debounce Time (Seconds)",
-              "log_level": "Log Level"
+              "log_level": "Log Level",
+              "log_version_prefix": "Show Version in Logs"
             },
             "data_description": {
               "api_proxy_url": "Advanced: Base URL of a local tado-api-proxy instance. Do NOT include /api/v2. See README for details.",
@@ -531,7 +563,8 @@
               "call_jitter_enabled": "Adds random delays before API calls to obfuscate automation patterns. Only effective when using a proxy.",
               "jitter_percent": "Strength of random variation for polls and calls. Default 10% (e.g. 60s -> 54-66s).",
               "debounce_time": "Time window to collect rapid changes before sending to API. Default 5s.",
-              "log_level": "Controls the verbosity of the logs. DEBUG shows all API interactions (masked), INFO shows important system events."
+              "log_level": "Controls the verbosity of the logs. DEBUG shows all API interactions (masked), INFO shows important system events.",
+              "log_version_prefix": "Prepends [vX.Y.Z] to every log message from this integration. Makes the running version immediately visible in any log snippet."
             }
           }
         }

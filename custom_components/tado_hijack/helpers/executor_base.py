@@ -12,7 +12,12 @@ from typing import TYPE_CHECKING, Any
 
 from tadoasync.models import TemperatureOffset
 
-from ..const import CONF_API_PROXY_URL, CONF_CALL_JITTER_ENABLED, OFF_MAGIC_TEMP
+from ..const import (
+    CONF_API_PROXY_URL,
+    CONF_CALL_JITTER_ENABLED,
+    HTTP_UNPROCESSABLE_ENTITY,
+    OFF_MAGIC_TEMP,
+)
 from .logging_utils import get_redacted_logger
 from .utils import apply_jitter
 
@@ -89,7 +94,29 @@ class TadoExecutorBase(ABC):
 
             return True
         except Exception as e:
-            if context:
+            if (
+                label == "presence"
+                and context
+                and context.get("presence", "").upper() == "AUTO"
+                and getattr(e, "status", None) == HTTP_UNPROCESSABLE_ENTITY
+            ):
+                _LOGGER.warning(
+                    "Presence AUTO is not supported: this home does not have Tado Auto-Assist. "
+                    "Use HOME or AWAY to manually lock presence."
+                )
+                from homeassistant.components.persistent_notification import (
+                    async_create as pn_create,
+                )
+
+                pn_create(
+                    self.coordinator.hass,
+                    f"Setting presence to **Auto** failed for **{self.coordinator.config_entry.title}** because your "
+                    "Tado home does not have **Auto-Assist**. Please use **Home** or **Away** to manually "
+                    "lock the presence state instead.",
+                    title=f"Auto-Assist not available ({self.coordinator.config_entry.title})",
+                    notification_id=f"tado_hijack_auto_assist_unavailable_{self.coordinator.config_entry.entry_id}",
+                )
+            elif context:
                 _LOGGER.error(
                     "Executor failed [%s]: %s (type: %s). Context: %s",
                     label,

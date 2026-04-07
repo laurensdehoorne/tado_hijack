@@ -205,13 +205,13 @@ While other integrations waste your precious API quota for every tiny interactio
 
 - **🚿 Professional Hot Water Platform:** Native `water_heater` entity with standardized `auto`, `heat`, and `off` modes. Full Pre-Validation ensures you never send invalid configurations.
 - **❄️ AC Pro Features:** Precise Fan Speed and Swing (Horizontal/Vertical) selection.
-- **📅 Schedule Transparency:** View the target temperature of your active Smart Schedule directly via the `auto_target_temperature` attribute while in `auto` mode (available for AC and Hot Water).
+- **📅 Schedule Transparency:** View the target temperature of your active Smart Schedule directly via the `auto_target_temperature` attribute while in `auto` mode (available for Heating, AC and Hot Water).
 - **🕵️‍♂️ Expert-Level Error Capturing:** Captures the actual response body from Tado\'s API (e.g. _"temperature must not be null"_), giving precise feedback for troubleshooting.
 - **🔥 Valve Opening Insight:** View the percentage of how far your valves are open (updated during state polls).
 - **🔋 Real Battery Status:** See the actual health of every valve.
 - **🌡️ Temperature Offset:** Interactive calibration for your thermostats.
 - **✨ Dazzle Mode:** Control the display behavior of your V3+ hardware.
-- **🏠 Presence Lock:** Force Home/Away modes globally.
+- **🏠 Presence Lock:** Force `home` or `away` globally via the `presence_mode` select entity. Set to `auto` to hand control back to Tado's own geofencing. **Note:** Handing control back to Tado via `auto` requires a Tado **Auto-Assist** subscription. If you don't have Auto-Assist, use `home` or `away` to manually lock the presence state via your own HA automations.
 - **🔥 Dynamic Presence-Aware Overlay:** Set temperatures specifically for the current presence state — automatically resets once your home presence changes.
 - **🌡️ Indoor Climate Intelligence:** Per-zone sensors for **dew point**, **mold risk** (level + binary), **indoor absolute humidity**, and **ventilation recommendation**. Calculated from room temperature and humidity using the Magnus formula and EU building-physics thresholds. Available for both v3 Classic and Tado X.
 - **🔓 Rate Limit Bypass:** Support for local [tado-api-proxy](https://github.com/s1adem4n/tado-api-proxy).
@@ -271,7 +271,7 @@ Tado's API limits are restrictive. That's why Tado Hijack uses a **Zero-Waste Po
 | **Refresh Offsets** | **1–N**  | On Demand  | Fetches device offsets. 1 call with `entity_id`, N without. | `GET /devices/{s}/temperatureOffset` (×1 or ×N)                                  |
 | **Refresh Away**    | **1–M**  | On Demand  | Fetches zone away temps. 1 call with `entity_id`, M without. | `GET /zones/{z}/awayConfiguration` (×1 or ×M)                                   |
 | **Zone Overlay**    | **1**  | On Demand     | **Fused:** All zone changes in 1 call.   | `POST /homes/{id}/overlay`                                                             |
-| **Home/Away**       | **1**  | On Demand     | Force presence lock.                     | `PUT /homes/{id}/presenceLock`                                                         |
+| **Presence**        | **1**  | On Demand     | Force presence lock (home/away=PUT, auto=DELETE). | `PUT /homes/{id}/presenceLock`<br>`DELETE /homes/{id}/presenceLock`              |
 
 _Note: Endpoints shown are v3 API. Tado X uses different endpoints (Hops API) but similar polling logic. See [Generation Support](#generation-support-v3-classic--tado-x) for differences._
 
@@ -444,6 +444,7 @@ Tado Hijack is now an **official HACS integration**! No custom repository needed
 | **Call Jitter**                    | `Off`     | **Anti-Ban Protection:** Adds random delays before API calls to obfuscate automation patterns (Proxy only).                                                                                                                                                |
 | **Jitter Strength**                | `10%`     | The percentage of random variation applied to intervals and delays (Proxy only).                                                                                                                                                                           |
 | **Log Level**                      | `INFO`    | Control integration verbosity (DEBUG, INFO, WARNING, ERROR).                                                                                                                                                                                               |
+| **Show Version in Logs**           | `On`      | Prepends `[vX.Y.Z]` to every log message from this integration. Makes the running version immediately visible in any log snippet — useful when sharing logs for support.                                                                                   |
 | **Suppress Redundant Calls**      | `Off`     | **API Optimization:** Skip API calls when target state matches cached state (temperature, mode, presence, power). Saves quota on accidental double-clicks or UI interactions. Only sends when actual change detected. Values not in cache always send. |
 | **Suppress Redundant Buttons**     | `Off`     | **Aggressive Optimization:** Also skip button actions (resume_all, boost_all, turn_off_all, set_mode_all) when ALL zones already match target state. Requires 'Suppress Redundant Calls' to be enabled. Individual explicit actions always send. |
 | **Dew Point Sensor**               | `On`      | Create a dew point temperature sensor per zone (Magnus formula, T + RH). v3: falls back to cloud zone state. Tado X: requires a linked temperature source on the zone device. |
@@ -532,7 +533,7 @@ Global controls and elite transparency for your home. _Linked to your Internet B
 
 | Entity                                     |  Type  | Description                                                       |
 | :----------------------------------------- | :----: | :---------------------------------------------------------------- |
-| `switch.tado_{home}_away_mode`             | Switch | Toggle Home/Away presence lock.                                   |
+| `select.tado_{home}_presence_mode`         | Select | Presence lock: `home` / `away` = manual override, `auto` = hand control back to Tado's own geofencing. |
 | `switch.tado_{home}_polling_active`        | Switch | **Master Switch:** Instantly stop/start all periodic API polls.   |
 | `switch.tado_{home}_reduced_polling_logic` | Switch | **Logic Switch:** Toggle the timed "Economy" profile.             |
 | `button.tado_{home}_resume_all_schedules`  | Button | Restore Smart Schedule across all zones (1 bulk call).            |
@@ -626,7 +627,7 @@ Cloud-only features that HomeKit does not support.
 | `sensor.next_schedule_mode`         | Sensor        | **Planning:** Mode (HEAT/OFF) of the upcoming schedule block.                                   |
 | `sensor.next_time_block_start`      | Sensor        | **Planning:** Start time of the next schedule block.                                            |
 | `button.resume_schedule`            | Button        | Force resume schedule (stateless). **Supports heating and AC zones** (v3).                      |
-| `attribute.auto_target_temperature` | Metadata      | **Transparency:** Current schedule setpoint visible in attributes during `auto` mode (AC & HW). |
+| `attribute.auto_target_temperature` | Metadata      | **Transparency:** Current schedule setpoint visible in attributes during `auto` mode (Heating, AC & HW). |
 
 <br>
 

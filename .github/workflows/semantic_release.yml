@@ -35,15 +35,15 @@ jobs:
 
     steps:
       - name: "Checkout full repository history"
-        uses: "actions/checkout@v4"
+        uses: "actions/checkout@v5"
         with:
           fetch-depth: 0
           token: ${{ secrets.SEMANTIC_RELEASE_TOKEN }}
 
       - name: "Setup Node.js environment"
-        uses: "actions/setup-node@v4"
+        uses: "actions/setup-node@v5"
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: "Install semantic-release and required plugins"
         run: |

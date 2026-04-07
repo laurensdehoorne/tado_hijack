@@ -50,7 +50,7 @@ def _check_overlay_redundancy(
 
     setting = command.data.get("setting", {})
     target_power = setting.get("power")
-    target_temp = setting.get("temperature", {}).get("celsius")
+    target_temp = (setting.get("temperature") or {}).get("celsius")
 
     cache_state = optimistic.get_zone(zone_id)
     if not cache_state:
@@ -500,52 +500,64 @@ def should_skip_all_action_provider(
 
 def _filter_zone_updates(
     merged: dict[str, Any],
-    action_provider: TadoActionProvider,
+    zone_states: dict[str, Any],
 ) -> dict[str, Any]:
-    """Filter redundant zone updates from merged data."""
+    """Filter redundant zone updates from merged data.
+
+    Compares against pre-patch states (cmd.rollback_context) captured before
+    optimistic patching. coordinator.data.zone_states is mutated in-place by
+    state_patcher before queuing, so it already reflects the target by batch time.
+    """
     if zones := merged.get("zones", {}):
-        filtered_zones = {}
+        filtered_zones: dict[str, Any] = {}
         for zone_id_str, zone_data in zones.items():
             zone_id = int(zone_id_str)
 
-            setting = zone_data.get("setting", {})
-            target_power = setting.get("power")
-            target_temp = setting.get("temperature", {}).get("celsius")
-
-            cache_power = action_provider.get_zone_power(zone_id)
-            cache_temp = action_provider.get_zone_temperature(zone_id)
-
-            # No cache data → send
-            if cache_power is None:
+            # None = RESUME_SCHEDULE — removing an overlay is never redundant
+            if zone_data is None:
                 filtered_zones[zone_id_str] = zone_data
                 continue
 
-            # Check if redundant
-            is_redundant = False
+            setting = zone_data.get("setting", {})
+            target_power = setting.get("power")
+            target_temp = (setting.get("temperature") or {}).get("celsius")
 
-            # If power differs → not redundant
-            if target_power != cache_power:
-                pass  # Send
-            # If both OFF and match → redundant
-            elif target_power == POWER_OFF and cache_power == POWER_OFF:
-                is_redundant = True
+            state = zone_states.get(str(zone_id))
+            if state is None or not getattr(state, "overlay_active", False):
+                filtered_zones[zone_id_str] = zone_data
+                continue
+
+            api_setting = getattr(state, "setting", None)
+            cache_power = getattr(api_setting, "power", None) if api_setting else None
+
+            if cache_power is None or target_power != cache_power:
+                filtered_zones[zone_id_str] = zone_data
+                continue
+
+            if target_power == POWER_OFF:
                 _LOGGER.debug("Skipping redundant zone_%s overlay: both OFF", zone_id)
-            # If ON, check temperature
-            elif target_power == POWER_ON and target_temp is not None:
+                continue
+
+            if target_temp is not None:
+                cache_temp_obj = getattr(api_setting, "temperature", None)
+                cache_temp = (
+                    getattr(cache_temp_obj, "celsius", None)
+                    if cache_temp_obj is not None
+                    else None
+                )
                 if (
                     cache_temp is not None
                     and abs(cache_temp - target_temp) < TEMP_TOLERANCE
                 ):
-                    is_redundant = True
                     _LOGGER.debug(
                         "Skipping redundant zone_%s overlay: power=%s, temp=%s",
                         zone_id,
                         target_power,
                         target_temp,
                     )
+                    continue
 
-            if not is_redundant:
-                filtered_zones[zone_id_str] = zone_data
+            filtered_zones[zone_id_str] = zone_data
 
         merged["zones"] = filtered_zones
     return merged
@@ -588,7 +600,7 @@ def _filter_presence(
 
 def filter_redundant_merged_data(
     merged: dict[str, Any],
-    action_provider: TadoActionProvider,
+    zone_states: dict[str, Any],
     optimistic: OptimisticState,
     suppress_enabled: bool,
 ) -> dict[str, Any]:
@@ -599,7 +611,7 @@ def filter_redundant_merged_data(
 
     Args:
         merged: Merged command data from CommandMerger
-        action_provider: Generation-specific action provider for state checks
+        zone_states: Pre-patch states from cmd.rollback_context (state before optimistic patch)
         optimistic: Optimistic state manager for cache lookups
         suppress_enabled: Whether redundant call suppression is enabled
 
@@ -611,8 +623,7 @@ def filter_redundant_merged_data(
         return merged  # No filtering
 
     try:
-        # Filter zone updates
-        merged = _filter_zone_updates(merged, action_provider)
+        merged = _filter_zone_updates(merged, zone_states)
 
         # Filter simple attributes
         merged = _filter_simple_attributes(
