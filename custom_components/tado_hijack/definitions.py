@@ -1155,6 +1155,27 @@ ENTITY_DEFINITIONS: Final[list[TadoEntityDefinition]] = [
         unique_id_suffix="pwr",
     ),
     create_zone_sensor(
+        key="zone_mode",
+        supported_generations={GEN_CLASSIC},
+        value_fn=lambda c, zid: v3_parsers.parse_zone_mode(
+            c.data.zone_states.get(str(zid))
+        ),
+        device_class=SensorDeviceClass.ENUM,
+        icon="mdi:thermostat",
+        supported_zone_types={ZONE_TYPE_HEATING, ZONE_TYPE_AIR_CONDITIONING},
+        unique_id_suffix="mode",
+    ),
+    create_zone_sensor(
+        key="zone_mode",
+        supported_generations={GEN_X},
+        value_fn=lambda c, zid: tadox_parsers.parse_zone_mode(
+            c.data.zone_states.get(str(zid))
+        ),
+        device_class=SensorDeviceClass.ENUM,
+        icon="mdi:thermostat",
+        unique_id_suffix="mode",
+    ),
+    create_zone_sensor(
         key="humidity",
         value_fn=lambda c, zid: _get_zone_sensor_data(c, zid, "humidity"),
         unit="%",

@@ -142,6 +142,15 @@
       },
       "scan_interval": {
         "name": "Abfrageintervall"
+      },
+      "zone_mode": {
+        "name": "Zonenmodus",
+        "state": {
+          "schedule": "Zeitplan",
+          "off": "Aus",
+          "boost": "Boost",
+          "manual": "Manuell"
+        }
       }
     },
     "binary_sensor": {

@@ -163,3 +163,16 @@ def parse_ventilation_recommended(
     indoor_ah = compute_absolute_humidity(temp_celsius, rh)
     outdoor_ah = compute_absolute_humidity(outdoor_temp, outdoor_rh)
     return compute_ventilation_beneficial(indoor_ah, outdoor_ah, threshold)
+
+
+def parse_zone_mode(state: TadoXZoneState | None) -> str | None:
+    """Return the current operating mode of a Tado X zone."""
+    if not state:
+        return None
+    if not state.overlay_active:
+        return "schedule"
+    if state.setting.power == "OFF":
+        return "off"
+    if state.boost_mode is not None:
+        return "boost"
+    return "manual"

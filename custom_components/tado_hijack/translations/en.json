@@ -142,6 +142,15 @@
       },
       "scan_interval": {
         "name": "Scan Interval"
+      },
+      "zone_mode": {
+        "name": "Zone Mode",
+        "state": {
+          "schedule": "Schedule",
+          "off": "Off",
+          "boost": "Boost",
+          "manual": "Manual"
+        }
       }
     },
     "binary_sensor": {

@@ -184,3 +184,20 @@ def parse_mold_risk_level(state: Any) -> str | None:
         return None
     temp, rh = values
     return compute_mold_risk_level(temp, rh)
+
+
+def parse_zone_mode(state: Any) -> str | None:
+    """Return the current operating mode of a v3 zone."""
+    if not state:
+        return None
+    if not getattr(state, "overlay_active", False):
+        return "schedule"
+    setting = getattr(state, "setting", None)
+    power = getattr(setting, "power", "OFF") if setting else "OFF"
+    if power == "OFF":
+        return "off"
+    temp_obj = getattr(setting, "temperature", None) if setting else None
+    celsius = getattr(temp_obj, "celsius", None) if temp_obj else None
+    if celsius is not None and abs(celsius - 25.0) <= 0.1:
+        return "boost"
+    return "manual"
