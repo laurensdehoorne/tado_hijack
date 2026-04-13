@@ -7,6 +7,7 @@ from typing import Any
 
 import homeassistant.util.dt as dt_util
 
+from ...const import BOOST_MODE_TEMP, TEMP_TOLERANCE
 from ..climate_physics import (
     VENTILATION_AH_THRESHOLD as _DEFAULT_VENTILATION_AH_THRESHOLD,
 )
@@ -198,6 +199,6 @@ def parse_zone_mode(state: Any) -> str | None:
         return "off"
     temp_obj = getattr(setting, "temperature", None) if setting else None
     celsius = getattr(temp_obj, "celsius", None) if temp_obj else None
-    if celsius is not None and abs(celsius - 25.0) <= 0.1:
+    if celsius is not None and abs(celsius - BOOST_MODE_TEMP) <= TEMP_TOLERANCE:
         return "boost"
     return "manual"
