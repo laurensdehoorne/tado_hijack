@@ -70,6 +70,7 @@ from .const import (
     TEMP_MAX_HOT_WATER_OVERRIDE,
     TEMP_MIN_AC,
     TEMP_MIN_HOT_WATER,
+    ZONE_MODE_MIXED,
     ZONE_TYPE_AIR_CONDITIONING,
     ZONE_TYPE_HEATING,
     ZONE_TYPE_HOT_WATER,
@@ -931,7 +932,7 @@ def _parse_home_zone_mode(c: Any) -> str | None:
     modes = {parse_fn(zone_states.get(str(zid))) for zid in relevant_ids} - {None}
     if not modes:
         return None
-    return next(iter(modes)) if len(modes) == 1 else "mixed"
+    return next(iter(modes)) if len(modes) == 1 else ZONE_MODE_MIXED
 
 
 ENTITY_DEFINITIONS: Final[list[TadoEntityDefinition]] = [
@@ -1203,6 +1204,7 @@ ENTITY_DEFINITIONS: Final[list[TadoEntityDefinition]] = [
         ),
         device_class=SensorDeviceClass.ENUM,
         icon="mdi:thermostat",
+        supported_zone_types={ZONE_TYPE_HEATING, ZONE_TYPE_AIR_CONDITIONING},
         unique_id_suffix="mode",
     ),
     create_zone_sensor(

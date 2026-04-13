@@ -17,6 +17,7 @@ from ..climate_physics import (
 from ..climate_physics import (
     compute_dew_point as _compute_dew_point,
 )
+from ..parsers import resolve_zone_mode
 
 if TYPE_CHECKING:
     from datetime import datetime
@@ -169,10 +170,8 @@ def parse_zone_mode(state: TadoXZoneState | None) -> str | None:
     """Return the current operating mode of a Tado X zone."""
     if not state:
         return None
-    if not state.overlay_active:
-        return "schedule"
-    if state.setting.power == "OFF":
-        return "off"
-    if state.boost_mode is not None:
-        return "boost"
-    return "manual"
+    return resolve_zone_mode(
+        overlay_active=state.overlay_active,
+        power=state.setting.power,
+        is_boost=state.boost_mode is not None,
+    )
