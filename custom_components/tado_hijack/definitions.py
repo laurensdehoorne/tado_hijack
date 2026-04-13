@@ -923,7 +923,7 @@ def _parse_home_zone_mode(c: Any) -> str | None:
     relevant_ids = [
         zid
         for zid, zmeta in c.zones_meta.items()
-        if zmeta.type in {ZONE_TYPE_HEATING, ZONE_TYPE_AIR_CONDITIONING}
+        if getattr(zmeta, "type", ZONE_TYPE_HEATING) in {ZONE_TYPE_HEATING, ZONE_TYPE_AIR_CONDITIONING}
     ]
     if not relevant_ids:
         return None
