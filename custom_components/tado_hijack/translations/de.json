@@ -151,6 +151,16 @@
           "boost": "Boost",
           "manual": "Manuell"
         }
+      },
+      "home_mode": {
+        "name": "Haussenmodus",
+        "state": {
+          "schedule": "Zeitplan",
+          "off": "Aus",
+          "boost": "Boost",
+          "manual": "Manuell",
+          "mixed": "Gemischt"
+        }
       }
     },
     "binary_sensor": {
