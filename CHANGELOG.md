@@ -1,3 +1,9 @@
+## [5.6.0](https://github.com/banter240/tado_hijack/compare/v5.5.0...v5.6.0) (2026-05-19)
+
+### ✨ New Features
+
+* feat(translations): add Czech (cs) translation
+
 ## [5.5.0](https://github.com/banter240/tado_hijack/compare/v5.4.0...v5.5.0) (2026-05-15)
 
 ### ✨ New Features
