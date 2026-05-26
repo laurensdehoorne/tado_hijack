@@ -51,8 +51,8 @@ class TadoXMapper:
             if snapshot.home:
                 presence = snapshot.home.presence
             else:
-                _LOGGER.warning(
-                    "Tado X API returned snapshot without home field - using default presence"
+                _LOGGER.debug(
+                    "Tado X metadata snapshot has no home field - presence handled via v2 API"
                 )
             rooms = snapshot.rooms
             other_devices = snapshot.other_devices
@@ -109,8 +109,8 @@ class TadoXMapper:
         if snapshot and snapshot.home:
             self._last_presence = snapshot.home.presence
         else:
-            _LOGGER.warning(
-                "Tado X API returned snapshot without home field - using default presence"
+            _LOGGER.debug(
+                "Tado X metadata snapshot has no home field - presence handled via v2 API"
             )
 
         rooms = snapshot.rooms if snapshot else []
