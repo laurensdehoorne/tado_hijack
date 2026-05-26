@@ -151,8 +151,12 @@ class TadoXMapper:
         return self.bridge
 
     async def async_fetch_home_state(self) -> Any:
-        """Not used for Tado X — presence is embedded in metadata."""
-        return None
+        """Fetch presence from v2 home state endpoint."""
+        from types import SimpleNamespace
+
+        data = await self.bridge.async_get_home_state()
+        presence = data.get("presence", "HOME") if data else "HOME"
+        return SimpleNamespace(presence=presence)
 
     async def async_fetch_capabilities(self, zone_id: int) -> Any:
         """Not used for Tado X — no separate capabilities endpoint."""

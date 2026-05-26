@@ -130,12 +130,13 @@ class TadoDataManager:
             )
 
     def _add_presence_track_to_plan(self, plan: list[PollTask], now: float) -> None:
-        """Add presence/home state polling."""
-        if self.coordinator.generation == GEN_X:
-            return
-
+        """Add presence/home state polling (follows adaptive interval)."""
         elapsed = now - self._last_presence_poll
-        interval = float(self._presence_poll_seconds)
+        interval = (
+            self.coordinator.update_interval.total_seconds()
+            if self.coordinator.update_interval
+            else float(self._presence_poll_seconds)
+        )
         if not self._presence_init or (
             self._presence_invalidated_at > self._last_presence_poll
             or self._should_run_task(elapsed, interval)
@@ -199,8 +200,8 @@ class TadoDataManager:
         return 1
 
     def _measure_zones_poll_cost(self) -> int:
-        """Measure cost of zone_states poll."""
-        return 1
+        """Measure cost of a fast poll cycle (zones + presence)."""
+        return 2
 
     def _count_special_zones_v3(self) -> int:
         """Count v3 zones with special polling needs (AC/HOT_WATER)."""
@@ -216,7 +217,6 @@ class TadoDataManager:
     def estimate_daily_reserved_cost(self) -> tuple[int, dict[str, int]]:
         """Estimate API calls reserved for scheduled updates."""
         sec_day = SLOW_POLL_CYCLE_S
-        p_cost = 1
 
         special_zones = (
             self._count_special_zones_tadox()
@@ -233,16 +233,14 @@ class TadoDataManager:
         )
 
         breakdown = {
-            "presence_poll_total": int(p_cost * (sec_day / self._presence_poll_seconds))
-            if self._presence_poll_seconds > 0
-            else 0,
+            "presence_poll_total": 0,  # Now included in fast poll cost (zones + presence per cycle)
             "slow_poll_total": int(s_cost * (sec_day / self._slow_poll_seconds))
             if self._slow_poll_seconds > 0
             else 0,
             "offset_poll_total": int(o_cost * (sec_day / self._offset_poll_seconds))
             if self._offset_poll_seconds > 0
             else 0,
-            "zones_poll_cost": 1,
+            "zones_poll_cost": 2,
         }
         total = (
             breakdown["presence_poll_total"]
@@ -315,7 +313,7 @@ class TadoDataManager:
         )
 
     async def _fetch_presence(self, now: float) -> Any:
-        """Fetch presence state (V3 only)."""
+        """Fetch presence/home state."""
         if not self.provider:
             return None
 
